@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "VIGIL",
+    "slug": "vigil",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "vigil",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0C141A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.beloved.vigil"
+    },
+    "android": {
+      "package": "com.beloved.vigil",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#0C141A"
+      },
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "predictiveBackGestureEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#55DEAE"
+        }
+      ],
+      "expo-sqlite",
+      "expo-sharing"
+    ]
+  }
+}
