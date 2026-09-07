@@ -1,0 +1,6 @@
+{
+  "name": "VIGIL",
+  "description": "A thoughtful companion for intentional time tracking, reflection, and quiet daily rhythm.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

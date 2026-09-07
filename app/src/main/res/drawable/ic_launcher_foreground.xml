@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Mountain and glowing sun centerpiece representing VIGIL -->
+    <path
+        android:fillColor="#55DEAE"
+        android:pathData="M54,26 A14,14 0 1,0 54,54 A14,14 0 1,0 54,26 Z" />
+    <path
+        android:fillColor="#1D2C33"
+        android:pathData="M18,84 L42,50 L60,70 L72,56 L90,84 Z" />
+    <path
+        android:fillColor="#087A59"
+        android:pathData="M30,84 L50,60 L64,76 L78,64 L96,84 Z" />
+</vector>
