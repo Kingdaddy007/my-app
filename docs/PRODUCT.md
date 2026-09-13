@@ -1,5 +1,7 @@
 # Product contract
 
+> **Current amendment — 2026-09-13:** Private guest use remains foundational, but optional Circle identity, Friends/Close Friends, selective sharing, and fair opt-in challenges are now current serious-alpha scope. Track and Focus remain two user-facing experiences over one engine. Where this file excludes those capabilities, follow `PRODUCT_AND_SOCIAL_DIRECTION_2026-09-13.md`.
+
 ## Purpose and source of truth
 
 VIGIL helps Beloved understand his day and act intentionally. It should feel like a thoughtful companion: personal greeting, beautiful atmosphere, immediate activity controls, useful reflection. The user's spoken requirements and the three provided mockup boards inform this plan. The detailed defaults below are design decisions proposed for implementation, not claims the user individually specified them.

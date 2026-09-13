@@ -1,5 +1,7 @@
 # Ordered implementation tickets
 
+> **Current amendment — 2026-09-13:** Execute these original tickets through the superseding phases in `IMPLEMENTATION_AND_AUDIT_PLAN_2026-09-13.md`, which adds Track/Focus unification, progressive identity, Friends/Close Friends, selective sharing, authorization tests, Circle design states, and fair opt-in challenges.
+
 Each ticket requires changed files, checks actually run, evidence paths, and remaining uncertainty in BUILD_STATUS. Dependencies are explicit. A blocker on physical-device evidence does not prevent independent implementation work, but its gate remains unverified.
 
 ## T01 — Inspect and bootstrap

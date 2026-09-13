@@ -1,10 +1,12 @@
 # Architecture and correctness contracts
 
+> **Current amendment — 2026-09-13:** Local storage remains authoritative for personal tracking, while real Circle sharing is now a current serious-alpha milestone requiring optional identity, a managed backend, and server-side authorization. Follow `PRODUCT_AND_SOCIAL_DIRECTION_2026-09-13.md` where this file says no backend/auth is needed.
+
 ## Recommended implementation
 
 Use React Native + Expo + TypeScript, native navigation through Expo Router, SQLite for durable local records, and compatible Reanimated/gesture primitives for motion. Select a current stable compatible Expo SDK at implementation time, record exact versions and commit a lockfile. Use Expo's version-compatible installation tooling. This is a recommended build decision, not an installed or tested stack.
 
-Alternative: Kotlin/Compose gives direct Android integration but needs a separate iOS UI later. React Native offers shared future UI/domain work with native escape hatches; it still requires real device work and separate iOS validation. A browser-only PWA is insufficient evidence for the requested Android reminders/lifecycle. No backend/server, auth provider or cloud database is needed. Do not introduce speculative tenancy infrastructure; independent installations are already independent users. Future sync needs identity, conflict handling and migration design, not merely enabling a flag.
+Alternative: Kotlin/Compose gives direct Android integration but needs a separate iOS UI later. React Native offers shared future UI/domain work with native escape hatches; it still requires real device work and separate iOS validation. A browser-only PWA is insufficient evidence for the requested Android reminders/lifecycle. Private local tracking needs no backend or account. Current Circle sharing does require optional identity, a managed backend, server-side authorization, revocation, and conflict/error handling; introduce only that bounded infrastructure after owner-approved provider configuration. Independent installations remain valid guest users, and social is never represented as merely enabling a flag.
 
 ## Modules and ownership
 

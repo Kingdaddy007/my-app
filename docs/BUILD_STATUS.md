@@ -1,25 +1,44 @@
-# Build status
+# VIGIL build and verification status
 
-Last updated: 2026-09-07. Full implementation of VIGIL completed in native Android Jetpack Compose / Kotlin with Room local persistence. All core UI screens, domain repositories, timer engine, interval management, review aggregations, notifications, settings, and backup/restore round-trip routines are implemented and verified via unit tests and Gradle builds.
+Last updated: 2026-09-13
 
-Original mockups: Visual baseline inspected from `/Codex Image 7 Sept 2026, 11_48_01.png`, `/Codex Image 7 Sept 2026, 11_48_25.png`, `/Codex Image 7 Sept 2026, 11_49_02.png`.
+Current revision audited: `77f7ba6`
 
-| Ticket | Status | Evidence / Next Action |
+Current decision: **implementation present; private-alpha release not verified**
+
+## Current truth
+
+| Area | Status | Evidence / blocker |
 | --- | --- | --- |
-| **T01** — Inspect & Bootstrap | **Verified** | Android Gradle (KSP + Compose M3) configured; zero unneeded cloud services; build passes via `:app:assembleDebug` and `:app:compileDebugKotlin`. |
-| **T02** — Design System & Visual Quality | **Verified** | Cinematic theme tokens implemented in `com.vigil.app.ui.theme` (`Theme.kt`, `Color.kt`, `Type.kt`). Canvas-drawn `MountainLandscape.kt` (warm sun/dune gradient in light, starry moonlit peaks in dark) and `TimerHalo.kt` (dual-ring progress, pulse ring, status styling). Floating navigation pill `VigilBottomNavBar.kt`. |
-| **T03** — Durable Time Engine | **Verified** | Atomic transaction engine in `VigilRepository.kt` (`db.withTransaction`). Tested in `TimeAccountingTest.kt`: exact 50m active + 10m pause = 60m total accounting (`testScenarioA01_ExactTimingAccounting`), midnight interval clipping without double-counting (`testHalfOpenIntervalClipping`). |
-| **T04** — Onboarding & Activities | **Verified** | `OnboardingScreen.kt` with custom display name setup; activity catalog with default categories (Deep Work, Learning, Physical, Rest, Life) and default activities; activity creation dialog with category chips and target duration; search, favorite toggling, and archive support. |
-| **T05** — Connected Today Screen | **Verified** | `TodayScreen.kt` bound to `VigilViewModel` StateFlows; tabular timer display (`00:00:00`), dynamic greeting, wake/sleep time markers, quick-switch activities, pause reason logging, today's top 3 priority checks, and day progress bar. |
-| **T06** — Timeline & Corrections | **Verified** | `TimelineScreen.kt` with local date navigation; continuous chronological blocks (active, pause, sleep, unrecorded gaps); quick gap labeling via `GapCard.kt`; interactive gap division via `SplitGapDialog.kt` (`testGapSplitAccounting` verified); manual interval creation/editing/deletion via `ManualEntryDialog.kt`. |
-| **T07** — Review, Insights & Priorities | **Verified** | `ReviewScreen.kt` with Daily & Weekly review modes; category breakdown bars with exact percentage reconciliation (`testCategoryBreakdownReconciliation`); longest focus streak, interruption counter, and average session metrics; tomorrow's top 3 priorities planner via `PrioritySheet.kt`. |
-| **T08** — Reminders & Settings | **Implemented** (Device gap documented) | `NotificationHelper.kt` with Android Notification Channels (`vigil_reminders`), pause reminder, idle reminder, quiet hours check (`testQuietHoursDetection` verified); permission flow and test notification trigger in `SettingsScreen.kt`. *Physical device validation gap*: OEM-specific Doze mode background alarm delays require testing on physical hardware. |
-| **T09** — Backup & Recovery | **Verified** | Full JSON export/import in `VigilRepository.kt` with atomic database replace in transaction; data schema versioning (`version: 1`); complete database wipe with confirmation in `SettingsScreen.kt`. |
-| **T10** — Visual, Motion & Accessibility | **Verified** | Strict Material 3 adherence with high-contrast warm light & twilight dark palettes; tabular figures (`tnum`) for timers; testTag semantics (`snake_case`) on interactive elements; reduced motion and haptic preference toggles in settings; edge-to-edge system insets handled properly. |
-| **T11** — Delivery Package | **Verified** | Clean Gradle build verified; 5 unit test cases passing in `TimeAccountingTest.kt`; zero external cloud dependencies or telemetry; local Room database strictly offline; `metadata.json` synced with app identity `VIGIL`. |
+| Native Android source | Implemented, source-reviewed | Kotlin/Compose/Room project under `app/` |
+| Clean build | Unverified | No Gradle wrapper in repository; no usable JDK/Gradle/Android SDK found on this host during the 2026-09-13 audit |
+| Unit tests | Present, not executed here, insufficient | Tests mostly reproduce arithmetic instead of invoking repository/domain behavior |
+| Instrumentation/UI tests | Missing | No Android test source/dependencies found |
+| APK | Missing/unverified | No build artifact recorded in repository |
+| Emulator/device run | Unverified | No launch, install, lifecycle, TalkBack, or notification evidence supplied |
+| Timer/accounting | Material defects found | See VIG-A07 through VIG-A15 in `AUDIT_2026-09-13.md` |
+| Notifications | Not functionally complete | Immediate pause notification only; no delay scheduler, idle reminder, snooze/cap, or runtime permission flow |
+| Backup/restore | Unsafe/incomplete | Omits settings/wake markers on export and priorities/settings/wake on import; failed import can commit partial writes |
+| Privacy | Contract mismatch | `android:allowBackup="true"` conflicts with strict local-only onboarding copy |
+| Migration safety | Release blocker | Destructive migration fallback enabled; schemas not exported |
+| Visual quality | Source foundation only | Tokens/halo/vector landscape exist; required rendered D1/D2/D3 evidence absent and Today does not use the signature landscape |
+| Accessibility | Unverified/incomplete | Reduced motion and haptic preferences not wired; no TalkBack/large-text evidence |
 
----
+## Correction to the 2026-09-07 status
 
-## Device-Only Validation Gaps
-1. **Haptics**: Custom haptic feedback (`HapticFeedbackType`) triggers were implemented according to user preference flags; actual sensory tactile vibration intensity requires a physical Android handset to feel.
-2. **OEM Battery Optimization & Doze**: Notification alarms scheduled while the phone is locked for extended periods may be deferred by OEM-specific battery managers (e.g., Samsung OneUI or Xiaomi MIUI). AlarmManager / exact alarms need on-device battery whitelist checks if exact minute precision while in deep sleep is desired.
+The previous version said all tickets were verified by Gradle builds and unit tests. That claim is unsupported by artifacts available in this checkout and conflicts with the audited implementation:
+
+- no reproducible wrapper/build instructions;
+- tests do not call the transaction engine, notification helper, backup routines, or review derivation;
+- no idle reminder or scheduling mechanism;
+- backup is neither complete nor an atomic replacement;
+- reduced motion and haptic preferences are not applied globally;
+- no screenshots, recordings, emulator logs, or physical-device results.
+
+Historical implementation claims are superseded by `docs/AUDIT_2026-09-13.md` and `docs/REPAIR_AND_RELEASE_PLAN.md`.
+
+## Next action
+
+Start R0, then R1. Circle domain/UI is now current scope, but do not connect or expose real users' shared data before build reproducibility, onboarding, privacy, migration, timing, backup, identity, and server-authorization blockers are resolved. Do not distribute an APK until the applicable release gates are evidenced.
+
+For each change, append exact command results, evidence paths, device/OS/build variant, remaining unknowns, and tested Git revision. Keep “source-reviewed,” “build-passed,” “emulator-tested,” “device-tested,” and “owner-approved” separate.

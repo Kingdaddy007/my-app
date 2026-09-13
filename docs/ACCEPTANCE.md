@@ -1,5 +1,7 @@
 # Verification and audit contract
 
+> **Current amendment — 2026-09-13:** These original criteria remain necessary but are no longer sufficient. The current release also requires the Track/Focus, non-mutating navigation/preview, Circle authorization/revocation, sharing-preview, challenge fairness, and social design evidence in `IMPLEMENTATION_AND_AUDIT_PLAN_2026-09-13.md`.
+
 No checks below have been run yet. Use pass/fail/unverified with evidence, tool/device/build version and date. Static checks are not native or visual proof. Never replace a failing behavior with a hardcoded fixture or weaken its requirement to pass.
 
 ## Critical correctness

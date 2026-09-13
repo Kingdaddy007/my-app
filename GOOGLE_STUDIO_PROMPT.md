@@ -1,0 +1,11 @@
+# Prompt for Google Studio
+
+Pull the latest main from https://github.com/Kingdaddy007/my-app.git and work from that exact revision. Do not commit, push, publish, deploy, create a cloud project, or upload personal data unless I explicitly authorize it.
+
+First read START_HERE.md, docs/PRODUCT_AND_SOCIAL_DIRECTION_2026-09-13.md, .agents/contexts/vigil-product-design-context.md, and docs/IMPLEMENTATION_AND_AUDIT_PLAN_2026-09-13.md. Then read the original product/design/architecture/acceptance files and visually inspect all three Codex Image 7 Sept 2026 PNG mockup boards. The dated files supersede older statements that social/accounts are later or that Focus should be removed.
+
+Audit the pulled implementation before editing and preserve its current framework unless you intentionally create a clearly isolated alternative version. Implement open-ended Track and 45-minute-prominent Focus as two experiences over one canonical session/history engine. Navigating to Timeline, Review, Circle, Settings, filters, or preview must never alter the live timer, and tutorial/preview data must remain isolated.
+
+Friends and Close Friends are current scope: mutual friendship, a second mutual Close Friend elevation, per-field sharing, sensitive fields private by default, preview-as-viewer, revocation/blocking, encouragement, and fair opt-in challenges—not a global raw-hours leaderboard. Real cross-phone sharing requires server-side authorization. If an approved Firebase configuration is unavailable, implement the provider boundary, rules/security tests, polished Circle states, and a clearly labeled local demo, then state the exact blocker rather than faking cloud completion.
+
+Treat the mockups as a quality floor. Deliver an exceptionally premium cinematic Android experience with refined landscape light, typography, hierarchy, light/dark themes, purposeful motion and haptics, reduced motion, TalkBack, large text, and complete empty/loading/error/offline states. Render and inspect phone-sized states at 360dp and 412dp, run all available tests/builds, keep new evidence separate from inherited claims, and finish with exact preview instructions, changed files, real-versus-demo social status, remaining blockers, and confirmation that nothing was pushed.

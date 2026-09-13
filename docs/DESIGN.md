@@ -1,5 +1,7 @@
 # Design direction — light through landscape
 
+> **Current amendment — 2026-09-13:** The design now includes distinct Track and Focus experiences plus a private Circle journey. Follow `.agents/contexts/vigil-product-design-context.md` and `IMPLEMENTATION_AND_AUDIT_PLAN_2026-09-13.md` where this file says not to add social or describes only one timer entry.
+
 Latest owner clarification: the mockups are a quality reference, not a pixel-copy ceiling. Improve composition, detail, interaction and useful supporting screens beyond them. Android is the primary design and testing environment. Honor Android back behavior, system bars, notification channels, permission flows, accessibility and touch conventions; do not imitate iPhone hardware or force iOS controls onto Android. New details should serve the approved journeys, not silently expand into cloud, AI or social features.
 
 ## Mandatory source images
