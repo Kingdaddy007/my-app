@@ -266,6 +266,21 @@ class VigilViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun labelGap(startMs: Long, endMs: Long, activityId: String) {
+        val act = _activities.value.find { it.id == activityId }
+        if (act != null) {
+            labelWholeGap(startMs, endMs, act)
+        } else {
+            viewModelScope.launch {
+                val result = repository.labelGap(startMs, endMs, activityId)
+                result.onSuccess { interval ->
+                    refreshTimeline()
+                    refreshReview()
+                }
+            }
+        }
+    }
+
     fun splitGap(startMs: Long, splitMs: Long, endMs: Long, actId1: String, actId2: String) {
         viewModelScope.launch {
             val result = repository.splitGap(startMs, splitMs, endMs, actId1, actId2)
@@ -344,6 +359,13 @@ class VigilViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- PRIORITIES ---
+
+    fun setTodayPriorities(titles: List<String>) {
+        viewModelScope.launch {
+            val todayStr = LocalDate.now().toString()
+            repository.setPriorities(todayStr, titles)
+        }
+    }
 
     fun setTomorrowPriorities(titles: List<String>) {
         viewModelScope.launch {
@@ -433,6 +455,116 @@ class VigilViewModel(application: Application) : AndroidViewModel(application) {
             refreshTimeline()
             refreshReview()
             onComplete()
+        }
+    }
+
+    // --- CONVENIENCE ALIASES & HELPERS FOR SCREENS ---
+
+    val selectedDate: StateFlow<LocalDate> get() = _timelineDate
+    val daySummary: StateFlow<DaySummary?> get() = _timelineSummary
+    val liveState: StateFlow<LiveSessionState> get() = _liveSessionState
+    val activeActivities: StateFlow<List<ActivityEntity>> get() = _activities
+    val allActivities: StateFlow<List<ActivityEntity>> get() = _activities
+
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+
+    fun previousDay() {
+        setTimelineDate(_timelineDate.value.minusDays(1))
+    }
+
+    fun nextDay() {
+        setTimelineDate(_timelineDate.value.plusDays(1))
+    }
+
+    fun goToToday() {
+        setTimelineDate(LocalDate.now())
+    }
+
+    fun setWeeklyReview(isWeekly: Boolean) {
+        toggleReviewWeekly(isWeekly)
+    }
+
+    fun clearSnackbar() {
+        _snackbarMessage.value = null
+        clearUndo()
+    }
+
+    fun updateDisplayName(name: String) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(displayName = name)
+            repository.updateSettings(updated)
+            _settings.value = updated
+        }
+    }
+
+    fun updateTheme(theme: String) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(themePreference = theme)
+            repository.updateSettings(updated)
+            _settings.value = updated
+        }
+    }
+
+    fun updateQuietHours(start: String, end: String) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(quietHoursStart = start, quietHoursEnd = end)
+            repository.updateSettings(updated)
+            _settings.value = updated
+        }
+    }
+
+    fun updateReminders(enabled: Boolean, pauseMin: Int, idleMin: Int) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(
+                remindersEnabled = enabled,
+                pauseReminderMinutes = pauseMin,
+                idleReminderMinutes = idleMin
+            )
+            repository.updateSettings(updated)
+            _settings.value = updated
+        }
+    }
+
+    fun updateAccessibility(reducedMotion: Boolean, haptics: Boolean) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(
+                reducedMotionEnabled = reducedMotion,
+                hapticsEnabled = haptics
+            )
+            repository.updateSettings(updated)
+            _settings.value = updated
+        }
+    }
+
+    fun testReminderNotification() {
+        notificationHelper.showTestNotification(_settings.value)
+    }
+
+    suspend fun exportJson(): String = repository.exportJson()
+
+    suspend fun importJson(json: String): Result<Int> {
+        val res = repository.importJson(json)
+        if (res.isSuccess) {
+            refreshLiveState()
+            refreshTimeline()
+            refreshReview()
+        }
+        return res
+    }
+
+    fun wipeDatabase() {
+        resetAllData {}
+    }
+
+    fun completeOnboarding(displayName: String) {
+        viewModelScope.launch {
+            val updated = _settings.value.copy(
+                displayName = displayName,
+                hasCompletedOnboarding = true
+            )
+            repository.updateSettings(updated)
+            _settings.value = updated
         }
     }
 }

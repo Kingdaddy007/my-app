@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.vigil.app.ui.components.MountainLandscape
 import com.vigil.app.ui.theme.VigilThemeExtensions
 
@@ -77,7 +78,7 @@ fun OnboardingScreen(
                 text = "VIGIL",
                 style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary,
-                letterSpacing = androidx.compose.ui.unit.sp(4)
+                letterSpacing = 4.sp
             )
 
             Text(

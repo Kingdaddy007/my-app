@@ -47,6 +47,7 @@ fun GapCard(
     activities: List<ActivityEntity>,
     onLabelWholeGap: (ActivityEntity) -> Unit,
     onSplitGap: () -> Unit,
+    onCustomLabelClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val durationMinutes = durationMs / 60_000L
@@ -143,6 +144,20 @@ fun GapCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
+                if (onCustomLabelClick != null) {
+                    OutlinedButton(
+                        onClick = onCustomLabelClick,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = warmColors.warmGapText
+                        ),
+                        modifier = Modifier
+                            .testTag("button_more_gap_labels")
+                            .padding(end = 8.dp)
+                    ) {
+                        Text("More…", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+
                 OutlinedButton(
                     onClick = onSplitGap,
                     colors = ButtonDefaults.outlinedButtonColors(

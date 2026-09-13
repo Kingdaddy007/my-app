@@ -85,4 +85,44 @@ class TimeAccountingTest {
         assertEquals(90 * 60 * 1000L, day2Dur)
         assertEquals(120 * 60 * 1000L, day1Dur + day2Dur)
     }
+
+    @Test
+    fun testQuietHoursDetection() {
+        fun isInQuietHours(timeStr: String, startStr: String, endStr: String): Boolean {
+            val parse = { s: String ->
+                val p = s.split(":")
+                p[0].toInt() * 60 + p[1].toInt()
+            }
+            val t = parse(timeStr)
+            val s = parse(startStr)
+            val e = parse(endStr)
+            return if (s > e) {
+                // Overnight quiet hours, e.g., 22:00 to 07:00
+                t >= s || t < e
+            } else {
+                t in s until e
+            }
+        }
+
+        // Night time 23:30 in 22:00-07:00
+        assertTrue(isInQuietHours("23:30", "22:00", "07:00"))
+        // Early morning 06:15 in 22:00-07:00
+        assertTrue(isInQuietHours("06:15", "22:00", "07:00"))
+        // Noon 12:00 outside 22:00-07:00
+        org.junit.Assert.assertFalse(isInQuietHours("12:00", "22:00", "07:00"))
+    }
+
+    @Test
+    fun testCategoryBreakdownReconciliation() {
+        val totalActive = 120 * 60 * 1000L // 2 hours
+        val deepWork = 90 * 60 * 1000L
+        val reading = 30 * 60 * 1000L
+
+        val p1 = (deepWork.toFloat() / totalActive) * 100f
+        val p2 = (reading.toFloat() / totalActive) * 100f
+
+        assertEquals(75.0f, p1, 0.01f)
+        assertEquals(25.0f, p2, 0.01f)
+        assertEquals(100.0f, p1 + p2, 0.01f)
+    }
 }

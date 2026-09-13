@@ -28,12 +28,14 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,6 +57,7 @@ import com.vigil.app.ui.theme.MintAccent
 import com.vigil.app.ui.theme.VigilThemeExtensions
 import com.vigil.app.ui.viewmodel.VigilViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScreen(
     viewModel: VigilViewModel,
@@ -65,6 +68,7 @@ fun ReviewScreen(
     val tomorrowPriorities by viewModel.tomorrowPriorities.collectAsState()
 
     var showTomorrowPriorityEditor by remember { mutableStateOf(false) }
+    val prioritySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -382,13 +386,14 @@ fun ReviewScreen(
 
     if (showTomorrowPriorityEditor) {
         PrioritySheet(
-            targetDateLabel = "Tomorrow",
-            initialPriorities = tomorrowPriorities.map { it.title },
+            dateLabel = "Tomorrow",
+            existingPriorities = tomorrowPriorities,
+            sheetState = prioritySheetState,
+            onDismiss = { showTomorrowPriorityEditor = false },
             onSavePriorities = { list ->
                 viewModel.setTomorrowPriorities(list)
                 showTomorrowPriorityEditor = false
-            },
-            onDismiss = { showTomorrowPriorityEditor = false }
+            }
         )
     }
 }

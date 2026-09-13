@@ -393,19 +393,15 @@ fun TimelineScreen(
                                 }
                             }
                             is TimelineBlock.Gap -> {
-                                val gapMinutes = block.durationMs / 60_000L
-                                val startStr = timeFormatter.format(Instant.ofEpochMilli(block.startMs))
-                                val endStr = timeFormatter.format(Instant.ofEpochMilli(block.endMs))
-
                                 GapCard(
-                                    gapDurationFormatted = "${gapMinutes}m",
-                                    timeRangeFormatted = "$startStr – $endStr",
-                                    quickActivities = activeActivities,
-                                    onLabelGap = { actId ->
-                                        viewModel.labelGap(block.startMs, block.endMs, actId)
+                                    startMs = block.startMs,
+                                    endMs = block.endMs,
+                                    durationMs = block.durationMs,
+                                    activities = activeActivities,
+                                    onLabelWholeGap = { act ->
+                                        viewModel.labelWholeGap(block.startMs, block.endMs, act)
                                     },
-                                    onSplitGapClick = { splitGapTarget = block },
-                                    onCustomLabelClick = { customGapToLabel = block }
+                                    onSplitGap = { splitGapTarget = block }
                                 )
                             }
                         }
@@ -444,61 +440,45 @@ fun TimelineScreen(
     // Dialogs
     if (showAddEntryDialog) {
         ManualEntryDialog(
-            defaultDate = selectedDate,
+            initialDateInstant = selectedDate.atStartOfDay(zoneId).toInstant().toEpochMilli(),
             activities = activeActivities,
+            onDismiss = { showAddEntryDialog = false },
             onSave = { start, end, actId, reason ->
                 viewModel.addManualEntry(start, end, actId, reason)
                 showAddEntryDialog = false
-            },
-            onDismiss = { showAddEntryDialog = false }
+            }
         )
     }
 
     if (intervalToEdit != null) {
         val intv = intervalToEdit!!
         ManualEntryDialog(
-            existingInterval = intv,
-            defaultDate = selectedDate,
+            initialDateInstant = intv.startInstant,
+            editingInterval = intv,
             activities = allActivities,
+            onDismiss = { intervalToEdit = null },
             onSave = { start, end, actId, reason ->
                 viewModel.editInterval(intv.id, start, end, actId, reason)
                 intervalToEdit = null
             },
-            onDelete = {
-                viewModel.deleteInterval(intv.id)
+            onDelete = { id ->
+                viewModel.deleteInterval(id)
                 intervalToEdit = null
-            },
-            onDismiss = { intervalToEdit = null }
+            }
         )
     }
 
     if (splitGapTarget != null) {
         val gap = splitGapTarget!!
         SplitGapDialog(
-            startInstant = gap.startMs,
-            endInstant = gap.endMs,
+            startMs = gap.startMs,
+            endMs = gap.endMs,
             activities = activeActivities,
+            onDismiss = { splitGapTarget = null },
             onConfirmSplit = { splitInstant, act1, act2 ->
                 viewModel.splitGap(gap.startMs, splitInstant, gap.endMs, act1, act2)
                 splitGapTarget = null
-            },
-            onDismiss = { splitGapTarget = null }
-        )
-    }
-
-    if (customGapToLabel != null) {
-        val gap = customGapToLabel!!
-        ActivityPickerSheet(
-            activities = activeActivities,
-            categories = categories,
-            onSelectActivity = { act ->
-                viewModel.labelGap(gap.startMs, gap.endMs, act.id)
-                customGapToLabel = null
-            },
-            onCreateActivity = { name, catId ->
-                viewModel.createActivity(name, catId)
-            },
-            onDismiss = { customGapToLabel = null }
+            }
         )
     }
 }

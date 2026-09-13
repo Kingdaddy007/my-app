@@ -283,6 +283,18 @@ class VigilRepository(private val db: AppDatabase) {
         Result.success(completedSession)
     }
 
+    suspend fun extendSessionTarget(
+        extraSeconds: Long,
+        timestamp: Long = System.currentTimeMillis()
+    ): Result<Unit> = db.withTransaction {
+        val currentLive = sessionDao.getLiveSessionImmediate()
+            ?: return@withTransaction Result.failure(IllegalStateException("No active session to extend"))
+        val currentTarget = currentLive.targetSeconds ?: 0L
+        val newTarget = currentTarget + extraSeconds
+        sessionDao.updateSession(currentLive.copy(targetSeconds = newTarget, updatedAt = timestamp))
+        Result.success(Unit)
+    }
+
     suspend fun switchSession(
         newActivityId: String,
         timestamp: Long = System.currentTimeMillis()

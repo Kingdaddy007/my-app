@@ -1,3 +1,8 @@
+@file:OptIn(
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
+
 package com.vigil.app.ui.components
 
 import androidx.compose.foundation.background
@@ -6,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,16 +56,16 @@ import com.vigil.app.data.model.ActivityEntity
 import com.vigil.app.data.model.CategoryEntity
 import com.vigil.app.ui.theme.VigilThemeExtensions
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ActivityPickerSheet(
-    sheetState: SheetState,
     activities: List<ActivityEntity>,
     categories: List<CategoryEntity>,
     onDismiss: () -> Unit,
     onSelectActivity: (ActivityEntity) -> Unit,
     onCreateActivity: (name: String, categoryId: String, targetSeconds: Long?) -> Unit,
-    onToggleFavorite: (ActivityEntity) -> Unit
+    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    onToggleFavorite: (ActivityEntity) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -189,6 +197,7 @@ fun ActivityPickerSheet(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateActivityDialog(
     categories: List<CategoryEntity>,

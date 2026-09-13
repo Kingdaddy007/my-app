@@ -1,12 +1,20 @@
+@file:OptIn(
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
+
 package com.vigil.app.ui.screens.today
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,12 +29,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -34,6 +45,8 @@ import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,18 +64,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vigil.app.data.model.ActivityEntity
 import com.vigil.app.ui.components.ActivityPickerSheet
-import com.vigil.app.ui.components.MountainLandscape
+import com.vigil.app.ui.components.FocusTimerComponent
 import com.vigil.app.ui.components.PrioritySheet
 import com.vigil.app.ui.components.TimerHalo
 import com.vigil.app.ui.components.TimerStatus
 import com.vigil.app.ui.theme.TabularFontFeature
 import com.vigil.app.ui.theme.VigilThemeExtensions
+import com.vigil.app.ui.viewmodel.FocusTimerViewModel
 import com.vigil.app.ui.viewmodel.VigilViewModel
 import java.time.Instant
 import java.time.LocalDate
@@ -71,10 +88,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TodayScreen(
     viewModel: VigilViewModel,
+    focusTimerViewModel: FocusTimerViewModel = viewModel(),
     onNavigateToTimeline: () -> Unit
 ) {
     val liveState by viewModel.liveSessionState.collectAsState()
@@ -85,6 +103,8 @@ fun TodayScreen(
     val todayWakeMarker by viewModel.todayWakeMarker.collectAsState()
     val timelineSummary by viewModel.timelineSummary.collectAsState()
 
+    var isFocusMode by remember { mutableStateOf(false) }
+    var selectedNormalActivity by remember { mutableStateOf<ActivityEntity?>(null) }
     var showActivityPicker by remember { mutableStateOf(false) }
     var isSwitchMode by remember { mutableStateOf(false) }
     var showPauseReasonDialog by remember { mutableStateOf(false) }
@@ -93,36 +113,6 @@ fun TodayScreen(
 
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val prioritySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    val session = liveState.session
-    val isRunning = session?.status == "running"
-    val isPaused = session?.status == "paused"
-
-    val timerStatus = when {
-        isRunning -> {
-            val targetSec = liveState.session?.targetSeconds
-            if (targetSec != null && (liveState.activeDurationMs / 1000) >= targetSec) {
-                TimerStatus.TARGET_REACHED
-            } else {
-                TimerStatus.RUNNING
-            }
-        }
-        isPaused -> TimerStatus.PAUSED
-        else -> TimerStatus.IDLE
-    }
-
-    // Tabular time string
-    val totalDisplayMs = if (isRunning) liveState.activeDurationMs else if (isPaused) liveState.activeDurationMs else 0L
-    val totalSeconds = totalDisplayMs / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-
-    val timeString = if (hours > 0) {
-        String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format(Locale.US, "%02d:%02d", minutes, seconds)
-    }
 
     val greeting = remember(settings.displayName) {
         val hour = LocalTime.now().hour
@@ -200,237 +190,115 @@ fun TodayScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Hero Mountain Artwork & Timer Stack
-        Box(
+        // Mode Switcher: Daily Tracker (Normal Mode) vs. Focus Timer (Deep Focus Mode)
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
-                .clip(RoundedCornerShape(28.dp)),
-            contentAlignment = Alignment.Center
+                .clip(RoundedCornerShape(16.dp))
+                .background(VigilThemeExtensions.colors.raisedSurface)
+                .border(1.dp, VigilThemeExtensions.colors.border, RoundedCornerShape(16.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            MountainLandscape(
-                modifier = Modifier.fillMaxSize(),
-                isRunning = isRunning,
-                reducedMotion = settings.reducedMotionEnabled
-            )
-
-            // Timer Halo Overlay
-            TimerHalo(
-                status = timerStatus,
-                reducedMotion = settings.reducedMotionEnabled,
-                size = 250.dp
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Activity Name Pill
-                    val currentActivityName = liveState.activity?.name ?: "Ready"
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(VigilThemeExtensions.colors.surface.copy(alpha = 0.85f))
-                            .clickable(enabled = session == null) {
-                                isSwitchMode = false
-                                showActivityPicker = true
-                            }
-                            .padding(horizontal = 14.dp, vertical = 4.dp)
-                            .testTag("tag_active_activity_pill")
-                    ) {
-                        Text(
-                            text = currentActivityName,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Tabular Timer Digits
-                    Text(
-                        text = timeString,
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontSize = 54.sp,
-                            fontFeatureSettings = TabularFontFeature
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.testTag("text_timer_digits")
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (!isFocusMode) VigilThemeExtensions.colors.surface else Color.Transparent)
+                    .border(
+                        if (!isFocusMode) 1.dp else 0.dp,
+                        if (!isFocusMode) VigilThemeExtensions.colors.border else Color.Transparent,
+                        RoundedCornerShape(12.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // State Status Text
-                    val statusText = when {
-                        isRunning -> "In session"
-                        isPaused -> "Paused · Pause: ${liveState.pauseDurationMs / 60000}m"
-                        else -> "What would you like to focus on?"
-                    }
-
+                    .clickable { isFocusMode = false }
+                    .padding(vertical = 8.dp)
+                    .testTag("tab_daily_tracker"),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = if (!isFocusMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = statusText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isPaused) VigilThemeExtensions.colors.amberAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                        "Daily Tracker",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (!isFocusMode) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (!isFocusMode) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isFocusMode) VigilThemeExtensions.colors.surface else Color.Transparent)
+                    .border(
+                        if (isFocusMode) 1.dp else 0.dp,
+                        if (isFocusMode) VigilThemeExtensions.colors.border else Color.Transparent,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable { isFocusMode = true }
+                    .padding(vertical = 8.dp)
+                    .testTag("tab_focus_timer"),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = if (isFocusMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Focus Timer",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isFocusMode) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isFocusMode) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Session Controls
-        if (session == null) {
-            // IDLE STATE: Large Start Button + Quick Activity Pills
-            Button(
-                onClick = {
-                    val defaultAct = activities.firstOrNull { it.isFavorite } ?: activities.firstOrNull()
-                    if (defaultAct != null) {
-                        viewModel.startSession(defaultAct)
-                    } else {
-                        isSwitchMode = false
-                        showActivityPicker = true
-                    }
+        // Main Timer Card: Displays either Normal Mode (Former Pattern) or Focus Mode (Targeted Deep Work)
+        if (isFocusMode) {
+            FocusTimerComponent(
+                viewModel = focusTimerViewModel,
+                onSelectActivityClick = {
+                    isSwitchMode = false
+                    showActivityPicker = true
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .testTag("btn_start_session"),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Start Focus", style = MaterialTheme.typography.titleMedium)
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Quick Activities FlowRow
-            androidx.compose.foundation.layout.FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                activities.take(8).forEach { act ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(VigilThemeExtensions.colors.raisedSurface)
-                            .border(1.dp, VigilThemeExtensions.colors.border, RoundedCornerShape(20.dp))
-                            .clickable { viewModel.startSession(act) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp)
-                            .testTag("quick_act_${act.name.lowercase()}")
-                    ) {
-                        Text(
-                            text = act.name,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
+            )
         } else {
-            // RUNNING or PAUSED STATE
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isRunning) {
-                    Button(
-                        onClick = { showPauseReasonDialog = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .testTag("btn_pause_session"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = VigilThemeExtensions.colors.raisedSurface,
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Icon(Icons.Default.Pause, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Pause", style = MaterialTheme.typography.titleSmall)
-                    }
-                } else {
-                    Button(
-                        onClick = { viewModel.resumeSession() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp)
-                            .testTag("btn_resume_session"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Resume", style = MaterialTheme.typography.titleSmall)
-                    }
-                }
-
-                Button(
-                    onClick = { viewModel.finishSession() },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .testTag("btn_finish_session"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(Icons.Default.Stop, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Finish", style = MaterialTheme.typography.titleSmall)
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        isSwitchMode = true
-                        showActivityPicker = true
-                    },
-                    modifier = Modifier
-                        .height(52.dp)
-                        .testTag("btn_switch_activity"),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Icon(Icons.Default.SwapHoriz, contentDescription = "Switch Activity")
-                }
-            }
-
-            // If paused, show reason chips
-            if (isPaused) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Reason:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    listOf("Break", "Phone call", "Distraction", "Walk").forEach { reason ->
-                        val isSelected = liveState.currentInterval?.reason == reason
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) VigilThemeExtensions.colors.amberAccent else VigilThemeExtensions.colors.raisedSurface)
-                                .clickable { viewModel.updatePauseReason(reason) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = reason,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
-            }
+            // Normal Mode: Legacy Pattern restored with clean luminous background & direct pause reasons
+            NormalTrackerCard(
+                liveState = liveState,
+                activities = activities,
+                selectedActivity = selectedNormalActivity,
+                onSelectActivity = { selectedNormalActivity = it },
+                onStartSession = { act -> viewModel.startSession(act) },
+                onPauseSession = { reason -> viewModel.pauseSession(reason) },
+                onResumeSession = { viewModel.resumeSession() },
+                onFinishSession = { viewModel.finishSession() },
+                onSwitchActivityClick = {
+                    isSwitchMode = true
+                    showActivityPicker = true
+                },
+                onOpenMoreActivities = {
+                    isSwitchMode = false
+                    showActivityPicker = true
+                },
+                onOpenPauseDialog = { showPauseReasonDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -485,7 +353,7 @@ fun TodayScreen(
 
         // Unaccounted Gap Prompt (if any trailing gap in today's timeline)
         val latestGap = timelineSummary?.blocks?.filterIsInstance<com.vigil.app.data.repository.TimelineBlock.Gap>()?.lastOrNull()
-        if (latestGap != null && session == null) {
+        if (latestGap != null && liveState.session == null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -589,7 +457,8 @@ fun TodayScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(36.dp))
+        // Generous bottom clearance to ensure content scrolls smoothly above the floating navigation bar
+        Spacer(modifier = Modifier.height(130.dp))
     }
 
     // Modal Bottom Sheets
@@ -603,7 +472,13 @@ fun TodayScreen(
                 if (isSwitchMode) {
                     viewModel.switchSession(selectedAct)
                 } else {
-                    viewModel.startSession(selectedAct)
+                    selectedNormalActivity = selectedAct
+                    if (isFocusMode) {
+                        focusTimerViewModel.selectActivity(selectedAct)
+                        focusTimerViewModel.startSession()
+                    } else {
+                        viewModel.startSession(selectedAct)
+                    }
                 }
                 showActivityPicker = false
             },
@@ -621,12 +496,8 @@ fun TodayScreen(
             sheetState = prioritySheetState,
             onDismiss = { showPrioritySheet = false },
             onSavePriorities = { titles ->
-                val todayStr = LocalDate.now().toString()
-                viewModel.repository.let {
-                    // Set priorities via viewModel launch
-                    kotlinx.coroutines.MainScope().run {
-                        viewModel.setTomorrowPriorities(titles) // will save to tomorrow, or today
-                    }
+                kotlinx.coroutines.MainScope().run {
+                    viewModel.setTomorrowPriorities(titles)
                 }
             }
         )
@@ -644,11 +515,11 @@ fun TodayScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Select or enter a reason for this pause:")
-                    androidx.compose.foundation.layout.FlowRow(
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        listOf("Break", "Phone call", "Distraction", "Hydration", "Other").forEach { r ->
+                        listOf("Break", "Phone call", "Distraction", "Hydration", "Walk", "Quick task").forEach { r ->
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
@@ -658,6 +529,7 @@ fun TodayScreen(
                                         showPauseReasonDialog = false
                                     }
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .testTag("dialog_pause_reason_${r.lowercase().replace(" ", "_")}")
                             ) {
                                 Text(r, style = MaterialTheme.typography.labelSmall)
                             }
@@ -668,15 +540,20 @@ fun TodayScreen(
                         onValueChange = { customReason = it },
                         label = { Text("Custom reason (optional)") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_custom_pause_reason")
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    viewModel.pauseSession(customReason.ifBlank { "Break" })
-                    showPauseReasonDialog = false
-                }) {
+                Button(
+                    onClick = {
+                        viewModel.pauseSession(customReason.ifBlank { "Break" })
+                        showPauseReasonDialog = false
+                    },
+                    modifier = Modifier.testTag("btn_confirm_pause_reason")
+                ) {
                     Text("Pause")
                 }
             },
@@ -705,19 +582,24 @@ fun TodayScreen(
                         onValueChange = { sleepHoursText = it.filter { ch -> ch.isDigit() || ch == '.' } },
                         label = { Text("Duration (hours)") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_sleep_hours")
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    val hoursVal = sleepHoursText.toDoubleOrNull() ?: 8.0
-                    val durationMs = (hoursVal * 3600 * 1000).toLong()
-                    val endMs = System.currentTimeMillis()
-                    val startMs = endMs - durationMs
-                    viewModel.recordSleepRange(startMs, endMs)
-                    showSleepDialog = false
-                }) {
+                Button(
+                    onClick = {
+                        val hoursVal = sleepHoursText.toDoubleOrNull() ?: 8.0
+                        val durationMs = (hoursVal * 3600 * 1000).toLong()
+                        val endMs = System.currentTimeMillis()
+                        val startMs = endMs - durationMs
+                        viewModel.recordSleepRange(startMs, endMs)
+                        showSleepDialog = false
+                    },
+                    modifier = Modifier.testTag("btn_save_sleep")
+                ) {
                     Text("Log Sleep")
                 }
             },
@@ -727,5 +609,447 @@ fun TodayScreen(
                 }
             }
         )
+    }
+}
+
+/**
+ * NormalTrackerCard: The former interaction pattern where users can tap what they want to do,
+ * view clean tabular time digits with a theme-adaptive luminous center (never black),
+ * pause with reasons, switch activities seamlessly, and finish.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NormalTrackerCard(
+    liveState: com.vigil.app.data.repository.LiveSessionState,
+    activities: List<ActivityEntity>,
+    selectedActivity: ActivityEntity?,
+    onSelectActivity: (ActivityEntity) -> Unit,
+    onStartSession: (ActivityEntity) -> Unit,
+    onPauseSession: (String?) -> Unit,
+    onResumeSession: () -> Unit,
+    onFinishSession: () -> Unit,
+    onSwitchActivityClick: () -> Unit,
+    onOpenMoreActivities: () -> Unit,
+    onOpenPauseDialog: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val session = liveState.session
+    val isRunning = session != null && session.status == "running"
+    val isPaused = session != null && session.status == "paused"
+    val isIdle = session == null
+
+    val activeSecs = liveState.activeDurationMs / 1000L
+    val h = activeSecs / 3600
+    val m = (activeSecs % 3600) / 60
+    val s = activeSecs % 60
+    val timerDigits = if (isIdle) "00:00:00" else String.format(Locale.US, "%02d:%02d:%02d", h, m, s)
+
+    val isDark = isSystemInDarkTheme()
+
+    Card(
+        modifier = modifier.testTag("tag_normal_tracker_card"),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = VigilThemeExtensions.colors.raisedSurface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Central Timer Halo Visual with Theme-Adaptive Radiant Disc (NO black background)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.radialGradient(
+                            colors = if (isDark) listOf(
+                                VigilThemeExtensions.colors.surface,
+                                VigilThemeExtensions.colors.raisedSurface
+                            ) else listOf(
+                                VigilThemeExtensions.colors.canvas.copy(alpha = 0.7f),
+                                VigilThemeExtensions.colors.raisedSurface
+                            )
+                        )
+                    )
+                    .border(
+                        1.dp,
+                        VigilThemeExtensions.colors.border.copy(alpha = 0.5f),
+                        RoundedCornerShape(24.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                TimerHalo(
+                    status = when {
+                        isRunning -> TimerStatus.RUNNING
+                        isPaused -> TimerStatus.PAUSED
+                        else -> TimerStatus.IDLE
+                    },
+                    targetProgress = null,
+                    size = 220.dp
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        // Activity Pill
+                        val currentAct = liveState.activity ?: selectedActivity ?: activities.firstOrNull { it.isFavorite } ?: activities.firstOrNull()
+                        val actName = currentAct?.name ?: "Select Activity"
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(VigilThemeExtensions.colors.surface)
+                                .border(1.dp, VigilThemeExtensions.colors.border, RoundedCornerShape(14.dp))
+                                .clickable {
+                                    if (isIdle) {
+                                        onOpenMoreActivities()
+                                    } else {
+                                        onSwitchActivityClick()
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                                .testTag("pill_normal_activity")
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isRunning -> VigilThemeExtensions.colors.mintAccent
+                                            isPaused -> VigilThemeExtensions.colors.amberAccent
+                                            else -> MaterialTheme.colorScheme.primary
+                                        }
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = actName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (!isIdle) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = "Switch Activity",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // High-contrast tabular timer digits
+                        Text(
+                            text = timerDigits,
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 46.sp,
+                                fontFeatureSettings = TabularFontFeature,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = if (isPaused) VigilThemeExtensions.colors.amberAccent else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.testTag("text_normal_timer_digits")
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Status Subtitle
+                        Text(
+                            text = when {
+                                isRunning -> "In Flow"
+                                isPaused -> {
+                                    val r = liveState.currentInterval?.reason?.takeIf { it.isNotBlank() } ?: "Break"
+                                    "Paused · ${liveState.pauseDurationMs / 60000}m ($r)"
+                                }
+                                else -> "Ready to begin"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when {
+                                isPaused -> VigilThemeExtensions.colors.amberAccent
+                                isRunning -> VigilThemeExtensions.colors.mintAccent
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Controls & Interactive Sections based on state
+            if (isIdle) {
+                // Former Activity Selection: Tap any activity chip to pick/start
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "What are you doing now?",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val quickList = activities.filter { it.isFavorite }.ifEmpty { activities.take(6) }
+                        val activeSelection = selectedActivity ?: quickList.firstOrNull()
+
+                        quickList.forEach { act ->
+                            val isSelected = (act.id == activeSelection?.id)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else VigilThemeExtensions.colors.surface
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) MaterialTheme.colorScheme.primary else VigilThemeExtensions.colors.border,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable {
+                                        onSelectActivity(act)
+                                        onStartSession(act)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    .testTag("chip_activity_${act.name.lowercase().replace(" ", "_")}")
+                            ) {
+                                Text(
+                                    text = act.name,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        // More activities button
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(VigilThemeExtensions.colors.surface)
+                                .border(1.dp, VigilThemeExtensions.colors.border, RoundedCornerShape(14.dp))
+                                .clickable { onOpenMoreActivities() }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .testTag("btn_normal_more_activities")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "More…",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val effectiveAct = selectedActivity ?: activities.firstOrNull { it.isFavorite } ?: activities.firstOrNull()
+                    Button(
+                        onClick = {
+                            if (effectiveAct != null) {
+                                onStartSession(effectiveAct)
+                            } else {
+                                onOpenMoreActivities()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("btn_normal_start_session"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VigilThemeExtensions.colors.mintAccent,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (effectiveAct != null) "Start ${effectiveAct.name}" else "Start Activity",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            } else if (isRunning) {
+                // Session is Running: Pause button, Finish button, and quick pause reason chips
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = onOpenPauseDialog,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                                .testTag("btn_normal_pause"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VigilThemeExtensions.colors.amberAccent,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Pause", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = onFinishSession,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                                .testTag("btn_normal_finish"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VigilThemeExtensions.colors.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Finish", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    // Direct Pause Reason Chips: tap any chip to pause immediately with that reason
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Tap reason to pause directly:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf("Break", "Phone call", "Walk", "Distraction", "Quick task").forEach { r ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(VigilThemeExtensions.colors.surface)
+                                        .border(1.dp, VigilThemeExtensions.colors.border, RoundedCornerShape(12.dp))
+                                        .clickable { onPauseSession(r) }
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .testTag("chip_direct_pause_${r.lowercase().replace(" ", "_")}")
+                                ) {
+                                    Text(
+                                        text = r,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (isPaused) {
+                // Session is Paused: Resume, Finish, and current pause reason
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val currentReason = liveState.currentInterval?.reason?.takeIf { it.isNotBlank() } ?: "Break"
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(VigilThemeExtensions.colors.surface)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Pause,
+                                contentDescription = null,
+                                tint = VigilThemeExtensions.colors.amberAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Paused for: $currentReason",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        TextButton(
+                            onClick = onOpenPauseDialog,
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Text("Change", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = onResumeSession,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                                .testTag("btn_normal_resume"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VigilThemeExtensions.colors.mintAccent,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Resume", fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = onFinishSession,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(50.dp)
+                                .testTag("btn_normal_finish_paused"),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = VigilThemeExtensions.colors.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Finish", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

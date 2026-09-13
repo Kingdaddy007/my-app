@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,9 +47,9 @@ import com.vigil.app.ui.theme.VigilThemeExtensions
 fun PrioritySheet(
     dateLabel: String,
     existingPriorities: List<PriorityEntity>,
-    sheetState: SheetState,
     onDismiss: () -> Unit,
     onSavePriorities: (List<String>) -> Unit,
+    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     onTogglePriority: ((priorityId: String) -> Unit)? = null
 ) {
     var p1 by remember(existingPriorities) { mutableStateOf(existingPriorities.getOrNull(0)?.title ?: "") }
