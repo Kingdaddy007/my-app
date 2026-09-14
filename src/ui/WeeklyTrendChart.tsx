@@ -25,9 +25,17 @@ export const WeeklyTrendChart: React.FC<WeeklyTrendChartProps> = ({
     maxDailyTargetMs,
     ...days.map((d) => d.activeMs)
   );
+  const accessibleSummary = days
+    .map((d) => `${d.dayLabel}: ${Math.round((d.activeMs / 3600000) * 10) / 10}h${d.isToday ? ' (today)' : ''}`)
+    .join(', ');
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessible={true}
+      accessibilityRole="image"
+      accessibilityLabel={`Weekly recorded focus: ${accessibleSummary}`}
+    >
       <View style={styles.barsRow}>
         {days.map((d, index) => {
           const ratio = highestMs > 0 ? Math.min(1, d.activeMs / highestMs) : 0;

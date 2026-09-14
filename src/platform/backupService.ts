@@ -6,7 +6,7 @@ import { BackupData } from '../domain/types';
  */
 export async function shareBackupFile(backup: BackupData): Promise<boolean> {
   const jsonString = JSON.stringify(backup, null, 2);
-  const fileName = `vigil-backup-${new Date().toISOString().split('T')[0]}.json`;
+  const fileName = `aevia-backup-${new Date().toISOString().split('T')[0]}.json`;
 
   if (Platform.OS === 'web') {
     // Web download via blob
@@ -33,7 +33,7 @@ export async function shareBackupFile(backup: BackupData): Promise<boolean> {
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(fileUri, {
         mimeType: 'application/json',
-        dialogTitle: 'Export VIGIL Backup',
+        dialogTitle: 'Export AEVIA Backup',
         UTI: 'public.json',
       });
       return true;
@@ -45,8 +45,18 @@ export async function shareBackupFile(backup: BackupData): Promise<boolean> {
 }
 
 /**
- * Prompt user to select a JSON backup file to import
+ * Prompt user to select a JSON backup file to import.
+ * Returns null ONLY when the user cancels. Corrupt/unparseable files throw
+ * INVALID_BACKUP so the UI can distinguish cancel (silent) from corruption
+ * (explicit "Invalid Backup" alert).
  */
+export class InvalidBackupError extends Error {
+  constructor(message = 'Backup file is not valid JSON.') {
+    super(message);
+    this.name = 'InvalidBackupError';
+  }
+}
+
 export async function pickBackupFile(): Promise<any | null> {
   if (Platform.OS === 'web') {
     return new Promise((resolve) => {
@@ -63,7 +73,7 @@ export async function pickBackupFile(): Promise<any | null> {
         try {
           resolve(JSON.parse(text));
         } catch {
-          resolve(null);
+          resolve(new InvalidBackupError());
         }
       };
       input.click();
@@ -87,8 +97,13 @@ export async function pickBackupFile(): Promise<any | null> {
       encoding: FileSystem.EncodingType.UTF8,
     });
 
-    return JSON.parse(content);
-  } catch {
+    try {
+      return JSON.parse(content);
+    } catch {
+      throw new InvalidBackupError();
+    }
+  } catch (error) {
+    if (error instanceof InvalidBackupError) throw error;
     return null;
   }
 }

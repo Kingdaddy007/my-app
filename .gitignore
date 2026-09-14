@@ -1,6 +1,8 @@
 node_modules/
 .expo/
 dist/
+dist-aevia/
+dist-audit/
 web-build/
 npm-debug.*
 yarn-debug.*

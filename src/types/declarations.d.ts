@@ -20,3 +20,8 @@ declare module 'sql.js' {
     Database: new (data?: ArrayBuffer | Uint8Array) => Database;
   }>;
 }
+
+declare module 'sql.js/dist/sql-asm.js' {
+  import initSqlJs from 'sql.js';
+  export default initSqlJs;
+}

@@ -93,5 +93,86 @@ describe('T07 - Review, Insights & Priorities Invariants (A09, A11, A12)', () =>
     expect(updated[0].completedAt).not.toBeNull();
     expect(updated[1].id).toBe('p3');
     expect(updated[2].id).toBe('p2');
+
+    // Edit priority title
+    updated[1].title = 'Verify SQLite durability & migrations';
+    await repo.savePriority(updated[1]);
+    const afterEdit = await repo.getPrioritiesForDate(date);
+    expect(afterEdit[1].title).toBe('Verify SQLite durability & migrations');
+
+    // Delete priority
+    await repo.deletePriority('p1');
+    const afterDelete = await repo.getPrioritiesForDate(date);
+    expect(afterDelete.length).toBe(2);
+    expect(afterDelete.some((p) => p.id === 'p1')).toBe(false);
+  });
+
+  test('User category breakdown is preserved in day accounting (DESIGN.md line 64)', async () => {
+    // Create custom user category and activity (e.g. Spiritual / Faith)
+    await repo.saveCategory({
+      id: 'cat-spiritual',
+      name: 'Spiritual & Prayer',
+      color: '#8B5CF6',
+      icon: 'heart-outline',
+      isDefault: false,
+      createdAt: clock.now(),
+    });
+    await repo.saveActivity({
+      id: 'act-prayer-custom',
+      name: 'Morning Devotion',
+      iconKey: 'heart',
+      categoryId: 'cat-spiritual',
+      isFavorite: true,
+      isArchived: false,
+      targetSeconds: 1200,
+      createdAt: clock.now(),
+      updatedAt: clock.now(),
+    });
+
+    clock.setTime(new Date('2026-09-07T09:00:00.000Z').getTime());
+    await engine.start('act-prayer-custom'); // Spiritual
+    clock.advance(20 * 60 * 1000);
+    await engine.switchActivity('act-deep-work'); // Focused Work
+    clock.advance(40 * 60 * 1000);
+    await engine.finish();
+
+    const intervals = await repo.getIntervals();
+    const sessions = await repo.getSessions();
+    const categories = await repo.getCategories();
+    const activities = await repo.getActivities(true);
+
+    const accounting = computeDayAccounting('2026-09-07', clock.now(), intervals, sessions, activities, categories);
+
+    // Verify each category has distinct accurate totals
+    const spiritualCat = accounting.categoryTotals.find((c) => c.categoryId === 'cat-spiritual');
+    const focusedCat = accounting.categoryTotals.find((c) => c.categoryId === 'cat-focused');
+
+    expect(spiritualCat).toBeDefined();
+    expect(spiritualCat?.totalMs).toBe(20 * 60 * 1000);
+    expect(focusedCat).toBeDefined();
+    expect(focusedCat?.totalMs).toBe(40 * 60 * 1000);
+  });
+
+  test('All pause reasons (Phone call, Break, Distraction, Other) can be recorded and labeled', async () => {
+    clock.setTime(new Date('2026-09-07T14:00:00.000Z').getTime());
+    await engine.start('act-deep-work');
+    clock.advance(15 * 60 * 1000);
+
+    // Pause with Phone call
+    await engine.pause('Phone call');
+    clock.advance(5 * 60 * 1000);
+    await engine.resume();
+    clock.advance(10 * 60 * 1000);
+
+    // Pause with Distraction
+    await engine.pause('Distraction');
+    clock.advance(3 * 60 * 1000);
+    await engine.finish();
+
+    const intervals = await repo.getIntervals();
+    const pauses = intervals.filter((i) => i.kind === 'pause');
+    expect(pauses.length).toBe(2);
+    expect(pauses[0].reason).toBe('Phone call');
+    expect(pauses[1].reason).toBe('Distraction');
   });
 });

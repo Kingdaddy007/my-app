@@ -45,6 +45,9 @@ export const AppIcon: React.FC<AppIconProps> = ({ name, size = 24, color }) => {
     case 'hourglass':
       mappedName = 'hourglass-outline';
       break;
+    case 'target':
+      mappedName = 'radio-button-on-outline';
+      break;
     case 'play':
       mappedName = 'play';
       break;
@@ -74,6 +77,55 @@ export const AppIcon: React.FC<AppIconProps> = ({ name, size = 24, color }) => {
       break;
     case 'time':
       mappedName = 'time-outline';
+      break;
+    case 'chevron-down':
+      mappedName = 'chevron-down-outline';
+      break;
+    case 'chevron-up':
+      mappedName = 'chevron-up-outline';
+      break;
+    case 'chevron-back':
+      mappedName = 'chevron-back-outline';
+      break;
+    case 'chevron-forward':
+      mappedName = 'chevron-forward-outline';
+      break;
+    case 'briefcase':
+      mappedName = 'briefcase-outline';
+      break;
+    case 'restaurant':
+      mappedName = 'restaurant-outline';
+      break;
+    case 'people':
+      mappedName = 'people-outline';
+      break;
+    case 'shield':
+      mappedName = 'shield-checkmark-outline';
+      break;
+    case 'bed':
+      mappedName = 'bed-outline';
+      break;
+    case 'bag':
+      mappedName = 'bag-handle-outline';
+      break;
+    case 'barbell':
+      mappedName = 'barbell-outline';
+      break;
+    case 'reorder':
+      mappedName = 'reorder-two-outline';
+      break;
+    case 'quote':
+      mappedName = 'chatbubble-ellipses-outline';
+      break;
+    case 'person':
+      mappedName = 'person-circle-outline';
+      break;
+    case 'home':
+      mappedName = 'home-outline';
+      break;
+    case 'plan':
+    case 'checkbox':
+      mappedName = 'checkbox-outline';
       break;
   }
 

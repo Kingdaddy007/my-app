@@ -10,8 +10,8 @@
 - **React:** 19.2.3
 - **React Native:** 0.86.3
 - **TypeScript:** ~6.0.3 (strict mode, zero errors)
-- **Jest:** 30.5.0 (5 test suites, 18 tests passing)
-- **Database:** SQLite (expo-sqlite on Android/native, sql.js in tests/web)
+- **Jest:** 30.5.0 (6 test suites, 35 tests passing, 0 failed)
+- **Database:** SQLite (expo-sqlite on Android/native, sql.js with local static assets & CDN fallback on web/tests)
 
 ---
 
@@ -23,5 +23,5 @@
   Compiling a native standalone Android APK directly on this local Windows machine requires installing JDK 17+ and the Android SDK / Build Tools (or running EAS Build / remote cloud build). Because no cloud/paid build services are authorized in this offline private task, standalone native APK compilation on this machine is blocked until JDK and Android SDK are provisioned.
 - **Native Target Verification Alternative:**
   The project is fully structured with Expo SDK 57 and React Native 0.86.3. Running `npx expo start` allows immediate loading via Expo Go on any Android phone, or building locally once Android Studio / Command Line Tools are installed.
-- **Web Compilation:**
-  `npx expo export -p web` succeeds completely (bundled in 6.4s, 1009 modules, 6 bundles, 37 assets).
+- **Web Compilation & SQLite WASM:**
+  `npx expo export -p web` succeeds completely (1009 modules, 6 bundles, 37 assets, WASM files exported to `dist/`). Web preview via `npx expo start --web` loads SQLite WASM reliably with zero MIME errors.

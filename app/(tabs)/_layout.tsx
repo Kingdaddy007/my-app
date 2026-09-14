@@ -1,16 +1,24 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/ui/ThemeContext';
+import { useApp } from '../../src/data/AppContext';
 import { AppIcon } from '../../src/ui/components/AppIcon';
 import { radii, typography } from '../../src/ui/tokens';
 
 export default function TabsLayout() {
   const { colors, mode } = useTheme();
+  const { sleeping } = useApp();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (sleeping) router.replace('/(tabs)');
+  }, [sleeping, router]);
 
   const isDark = mode === 'dark';
+  const chrome = sleeping ? '#12182A' : isDark ? 'rgba(16, 23, 34, 0.97)' : 'rgba(251, 249, 245, 0.97)';
 
   return (
     <Tabs
@@ -24,27 +32,36 @@ export default function TabsLayout() {
           {
             fontSize: 12,
             fontWeight: '600',
-            marginBottom: 4,
+            marginBottom: 2,
+            flexWrap: 'wrap',
           },
         ],
+        tabBarItemStyle: {
+          height: 62,
+          paddingVertical: 2,
+        },
         tabBarStyle: {
-          position: 'absolute',
-          bottom: Math.max(12, insets.bottom + 4),
-          left: 20,
-          right: 20,
-          height: 64,
-          borderRadius: radii.pill,
-          backgroundColor: isDark ? 'rgba(22, 34, 41, 0.94)' : 'rgba(255, 255, 255, 0.94)',
+          display: sleeping ? 'none' : 'flex',
+          position: 'relative',
+          height: 76 + Math.max(insets.bottom, 6),
+          marginHorizontal: 14,
+          marginBottom: Math.max(insets.bottom, 8),
+          borderRadius: 24,
+          backgroundColor: chrome,
           borderTopWidth: 1,
           borderWidth: 1,
-          borderColor: colors.border,
-          shadowColor: colors.cardShadow,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: isDark ? 0.4 : 0.1,
-          shadowRadius: 16,
-          elevation: 6,
-          paddingBottom: 4,
-          paddingTop: 6,
+          borderColor: sleeping ? '#818CF8' : colors.border,
+          ...(Platform.OS === 'web'
+            ? { boxShadow: isDark ? '0 6px 16px rgba(0,0,0,0.40)' : '0 6px 16px rgba(35,39,58,0.10)' }
+            : {
+                shadowColor: colors.cardShadow,
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: isDark ? 0.4 : 0.1,
+                shadowRadius: 16,
+                elevation: 6,
+              }),
+          paddingBottom: Math.max(insets.bottom, 6),
+          paddingTop: 7,
         },
       }}
     >
@@ -54,7 +71,7 @@ export default function TabsLayout() {
           title: 'Today',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && { backgroundColor: colors.actionSubtle }]}>
-              <AppIcon name={focused ? 'sun' : 'sun'} size={22} color={color as string} />
+              <AppIcon name="home" size={22} color={color as string} />
             </View>
           ),
         }}
@@ -76,7 +93,18 @@ export default function TabsLayout() {
           title: 'Review',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconWrapper, focused && { backgroundColor: colors.actionSubtle }]}>
-              <AppIcon name="stats" size={22} color={color as string} />
+              <AppIcon name="plan" size={22} color={color as string} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="circle"
+        options={{
+          title: 'Circle',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconWrapper, focused && { backgroundColor: colors.actionSubtle }]}>
+              <AppIcon name="people" size={22} color={color as string} />
             </View>
           ),
         }}
@@ -88,8 +116,8 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   iconWrapper: {
     width: 40,
-    height: 32,
-    borderRadius: 16,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },

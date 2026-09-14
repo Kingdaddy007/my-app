@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "VIGIL",
+    "name": "AEVIA",
     "slug": "vigil",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0C141A"
+      "backgroundColor": "#080C14"
     },
     "ios": {
       "supportsTablet": false,
@@ -21,7 +21,7 @@
       "package": "com.beloved.vigil",
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundColor": "#0C141A"
+        "backgroundColor": "#080C14"
       },
       "permissions": [
         "POST_NOTIFICATIONS",
@@ -30,13 +30,16 @@
       ],
       "predictiveBackGestureEnabled": true
     },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
     "plugins": [
       "expo-router",
       [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#55DEAE"
+          "color": "#91A7FF"
         }
       ],
       "expo-sqlite",

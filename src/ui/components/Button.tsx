@@ -53,7 +53,7 @@ export const Button: React.FC<ButtonProps> = ({
   let fontSize = typography.bodyMedium.fontSize;
 
   if (size === 'small') {
-    minHeight = 44;
+    minHeight = spacing.touchTargetMin;
     paddingHorizontal = 14;
     fontSize = typography.caption.fontSize;
   } else if (size === 'large') {
@@ -105,6 +105,12 @@ export const Button: React.FC<ButtonProps> = ({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      android_ripple={{
+        color: variant === 'primary' || variant === 'danger'
+          ? 'rgba(255,255,255,0.18)'
+          : 'rgba(145,167,255,0.18)',
+        borderless: false,
+      }}
       style={({ pressed }) => [
         styles.base,
         {
@@ -137,7 +143,7 @@ export const Button: React.FC<ButtonProps> = ({
                   textAlign: 'center',
                 },
               ]}
-              maxFontSizeMultiplier={1.5}
+              maxFontSizeMultiplier={2.0}
             >
               {label}
             </Text>

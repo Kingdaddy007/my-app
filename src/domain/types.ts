@@ -1,5 +1,5 @@
 /**
- * VIGIL Domain Types
+ * AEVIA Domain Types
  * Precise types for sessions, intervals, activities, categories, priorities, and settings.
  */
 
@@ -27,21 +27,30 @@ export type Activity = {
 };
 
 export type SessionStatus = 'running' | 'paused' | 'completed';
+export type SessionExperience = 'track' | 'focus';
+
+export type SessionStartOptions = {
+  experience: SessionExperience;
+  targetSeconds?: number | null;
+  intention?: string | null;
+};
 
 export type Session = {
   id: UUID;
   activityId: UUID;
   status: SessionStatus;
+  experience: SessionExperience;
   startedAt: number; // UTC ms
   endedAt?: number | null; // UTC ms
   targetSeconds?: number | null;
+  intention?: string | null;
   createdAt: number;
   updatedAt: number;
 };
 
 export type IntervalKind = 'active' | 'pause' | 'manual' | 'sleep';
 
-export type PauseReason = 'Break' | 'Phone call' | 'Distraction' | 'Rest' | 'Other' | 'Skip' | string;
+export type PauseReason = 'Break' | 'Phone call' | 'Distraction' | 'Rest' | 'Other' | string;
 
 export type Interval = {
   id: UUID;
@@ -86,7 +95,10 @@ export type UserSettings = {
   privacyMode: boolean; // default true (generic text on lockscreen)
   hapticsEnabled: boolean;
   reducedMotion: boolean;
+  focusTargetReminderEnabled?: boolean; // default false; explicit opt-in only
   hasCompletedOnboarding: boolean;
+  onboardingStep: number;
+  trackingAwarenessStartedAtMs?: number | null;
   lastWakeMarkerMs?: number | null;
 };
 

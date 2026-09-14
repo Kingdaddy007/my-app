@@ -17,8 +17,9 @@ import { Input } from '../src/ui/components/Input';
 import { Card } from '../src/ui/components/Card';
 import { AppIcon } from '../src/ui/components/AppIcon';
 import { radii, spacing, typography } from '../src/ui/tokens';
-import { sendTestReminder } from '../src/platform/notifications';
-import { pickBackupFile, shareBackupFile } from '../src/platform/backupService';
+import { getNotificationPermissionStatus, requestNotificationPermission, sendTestReminder, snoozeReminder } from '../src/platform/notifications';
+import { InvalidBackupError, pickBackupFile, shareBackupFile } from '../src/platform/backupService';
+import { parseQuietTime } from '../src/domain/quietHours';
 import { validateBackupData } from '../src/domain/backup';
 
 export default function SettingsScreen() {
@@ -29,6 +30,9 @@ export default function SettingsScreen() {
 
   const [nameInput, setNameInput] = useState(settings.profileName ?? '');
   const [isSavingName, setIsSavingName] = useState(false);
+  const [quietStartInput, setQuietStartInput] = useState(settings.quietHoursStart);
+  const [quietEndInput, setQuietEndInput] = useState(settings.quietHoursEnd);
+  const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
 
   const handleSaveName = async () => {
     setIsSavingName(true);
@@ -38,6 +42,20 @@ export default function SettingsScreen() {
   };
 
   const handleTestReminder = async () => {
+    const status = await getNotificationPermissionStatus();
+    setPermissionStatus(status);
+    if (status !== 'granted') {
+      const granted = await requestNotificationPermission();
+      const next = await getNotificationPermissionStatus();
+      setPermissionStatus(next);
+      if (!granted) {
+        Alert.alert(
+          'Notifications unavailable',
+          'Permission was not granted. AEVIA stays fully usable; check system Settings and battery optimization if you expect check-ins.'
+        );
+        return;
+      }
+    }
     const success = await sendTestReminder(settings);
     if (success) {
       Alert.alert('Test Sent', 'A test reminder has been scheduled.');
@@ -61,10 +79,20 @@ export default function SettingsScreen() {
 
   const handleImportBackup = async () => {
     if (!repo) return;
+    let payload: unknown;
     try {
-      const payload = await pickBackupFile();
-      if (!payload) return;
+      payload = await pickBackupFile();
+    } catch (err) {
+      Alert.alert('Invalid Backup', err instanceof Error ? err.message : 'File corrupted.');
+      return;
+    }
+    if (!payload) return;
+    if (payload instanceof InvalidBackupError) {
+      Alert.alert('Invalid Backup', payload.message);
+      return;
+    }
 
+    try {
       const validation = validateBackupData(payload);
       if (!validation.isValid) {
         Alert.alert('Invalid Backup', validation.errorMessage ?? 'File corrupted.');
@@ -80,15 +108,15 @@ export default function SettingsScreen() {
             text: 'Restore',
             style: 'destructive',
             onPress: async () => {
-              await repo.restoreAllData(payload);
+              await repo.restoreAllData(payload as never);
               await refresh();
               Alert.alert('Success', 'Backup restored successfully.');
             },
           },
         ]
       );
-    } catch (err: any) {
-      Alert.alert('Import error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Import error', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -222,13 +250,43 @@ export default function SettingsScreen() {
               Enable Reminders
             </Text>
             <Text style={[typography.caption, { color: colors.secondaryText }]}>
-              Gentle prompts when paused or when time is untracked.
+              Gentle prompts when paused or when time is untracked. At most one per hour, four per day.
             </Text>
           </View>
           <Switch
             value={settings.remindersEnabled}
-            onValueChange={(val) => updateUserSettings({ remindersEnabled: val })}
+            onValueChange={async (val) => {
+              if (val) {
+                const granted = await requestNotificationPermission();
+                const next = await getNotificationPermissionStatus();
+                setPermissionStatus(next);
+                if (!granted) {
+                  Alert.alert(
+                    'Permission needed',
+                    'Reminders stay off until notification permission is granted. Nothing else changes.'
+                  );
+                  return;
+                }
+              }
+              await updateUserSettings({ remindersEnabled: val });
+            }}
             trackColor={{ true: colors.primaryAction, false: colors.border }}
+            accessibilityLabel="Enable check-in reminders"
+          />
+        </View>
+
+        <View style={[styles.switchRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.bodyMedium, { color: colors.primaryText }]}>Focus target chime</Text>
+            <Text style={[typography.caption, { color: colors.secondaryText }]}>
+              Optional. Only chimes when you enable it for a live Focus session.
+            </Text>
+          </View>
+          <Switch
+            value={settings.focusTargetReminderEnabled ?? false}
+            onValueChange={(val) => updateUserSettings({ focusTargetReminderEnabled: val })}
+            trackColor={{ true: colors.primaryAction, false: colors.border }}
+            accessibilityLabel="Enable Focus target reminder"
           />
         </View>
 
@@ -247,9 +305,59 @@ export default function SettingsScreen() {
         </View>
 
         <View style={{ marginTop: 16 }}>
-          <Text style={[typography.metadata, { color: colors.secondaryText }]}>
-            QUIET HOURS: {settings.quietHoursStart} – {settings.quietHoursEnd} (No coaching alerts)
+          <Text style={[typography.metadata, { color: colors.secondaryText, marginBottom: 8 }]}>
+            QUIET HOURS · NO COACHING ALERTS
           </Text>
+          <View style={styles.quietRow}>
+            <Input
+              label="Starts"
+              placeholder="22:00"
+              value={quietStartInput}
+              onChangeText={setQuietStartInput}
+              maxLength={5}
+            />
+            <View style={{ width: 12 }} />
+            <Input
+              label="Ends"
+              placeholder="07:00"
+              value={quietEndInput}
+              onChangeText={setQuietEndInput}
+              maxLength={5}
+            />
+          </View>
+          <Button
+            label="Save quiet hours"
+            variant="outline"
+            size="small"
+            onPress={async () => {
+              if (parseQuietTime(quietStartInput) == null || parseQuietTime(quietEndInput) == null) {
+                Alert.alert('Invalid time', 'Use 24-hour HH:MM, for example 22:00 and 07:00.');
+                return;
+              }
+              await updateUserSettings({ quietHoursStart: quietStartInput.trim(), quietHoursEnd: quietEndInput.trim() });
+              Alert.alert('Saved', 'Quiet hours updated. Pending reminders reconcile on next foreground.');
+            }}
+            style={{ marginTop: 8, alignSelf: 'flex-start' }}
+          />
+          <Text style={[typography.caption, { color: colors.secondaryText, marginTop: 8 }]}>
+            Current: {settings.quietHoursStart} – {settings.quietHoursEnd} · Permission: {permissionStatus}
+          </Text>
+          <View style={styles.snoozeRow}>
+            {([15, 30, 60] as const).map((mins) => (
+              <Pressable
+                key={mins}
+                onPress={async () => {
+                  const id = await snoozeReminder(settings, mins, 'snoozed', (partial) => updateUserSettings(partial));
+                  Alert.alert(id ? 'Snoozed' : 'Not scheduled', id ? `One check-in in ${mins} minutes.` : 'Cap, quiet hours, or permission blocked this reminder.');
+                }}
+                style={[styles.snoozeBtn, { borderColor: colors.border, backgroundColor: colors.surfaceRaised }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Snooze reminders for ${mins} minutes`}
+              >
+                <Text style={[typography.caption, { color: colors.primaryText, fontWeight: '600' }]}>Snooze {mins}m</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <Button
@@ -267,7 +375,7 @@ export default function SettingsScreen() {
           Data & Privacy
         </Text>
         <Text style={[typography.caption, { color: colors.secondaryText, marginBottom: 16 }]}>
-          VIGIL never uploads your activity data to any cloud service. All records are stored
+          AEVIA never uploads your activity data to any cloud service. All records are stored
           locally on this device. Back up your data manually below.
         </Text>
 
@@ -349,6 +457,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  quietRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  snoozeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  snoozeBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonStack: {
     marginTop: 4,

@@ -10,6 +10,7 @@ import {
   WakeMarker,
 } from '../domain/types';
 import { DEFAULT_SETTINGS, INITIAL_ACTIVITIES, INITIAL_CATEGORIES } from './schema';
+import { validateBackupData } from '../domain/backup';
 
 export class Repository {
   constructor(private db: IDatabaseAdapter) {}
@@ -105,8 +106,21 @@ export class Repository {
     await this.db.executeSql(`UPDATE activities SET is_archived = 1, updated_at = ? WHERE id = ?;`, [Date.now(), id]);
   }
 
+  async unarchiveActivity(id: string): Promise<void> {
+    await this.db.executeSql(`UPDATE activities SET is_archived = 0, updated_at = ? WHERE id = ?;`, [Date.now(), id]);
+  }
+
   // ---------------- Sessions & Intervals ----------------
   async getCurrentSession(): Promise<{ session: Session; openInterval: Interval | null } | null> {
+    const countRes = await this.db.executeSql(
+      `SELECT COUNT(*) as count FROM sessions WHERE status IN ('running', 'paused');`
+    );
+    const openCount = Number(countRes.rows[0]?.count ?? 0);
+    if (openCount > 1) {
+      throw new Error(
+        'CORRUPT_SESSION_STATE: Multiple open sessions detected. Finish duplicates before continuing.'
+      );
+    }
     const res = await this.db.executeSql(
       `SELECT * FROM sessions WHERE status IN ('running', 'paused') ORDER BY started_at DESC LIMIT 1;`
     );
@@ -116,9 +130,11 @@ export class Repository {
       id: r.id,
       activityId: r.activity_id,
       status: r.status,
+      experience: r.experience === 'focus' ? 'focus' : 'track',
       startedAt: Number(r.started_at),
       endedAt: r.ended_at != null ? Number(r.ended_at) : null,
       targetSeconds: r.target_seconds != null ? Number(r.target_seconds) : null,
+      intention: r.intention ?? null,
       createdAt: Number(r.created_at),
       updatedAt: Number(r.updated_at),
     };
@@ -147,20 +163,24 @@ export class Repository {
 
   async saveSession(session: Session): Promise<void> {
     await this.db.executeSql(
-      `INSERT INTO sessions (id, activity_id, status, started_at, ended_at, target_seconds, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO sessions (id, activity_id, status, experience, started_at, ended_at, target_seconds, intention, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          status = excluded.status,
+         experience = excluded.experience,
          ended_at = excluded.ended_at,
          target_seconds = excluded.target_seconds,
+         intention = excluded.intention,
          updated_at = excluded.updated_at;`,
       [
         session.id,
         session.activityId,
         session.status,
+        session.experience,
         session.startedAt,
         session.endedAt ?? null,
         session.targetSeconds ?? null,
+        session.intention ?? null,
         session.createdAt,
         session.updatedAt,
       ]
@@ -171,8 +191,11 @@ export class Repository {
     let sql = `SELECT * FROM sessions`;
     const params: any[] = [];
     if (fromMs != null && toMs != null) {
-      sql += ` WHERE (started_at >= ? AND started_at < ?) OR (ended_at IS NULL) OR (ended_at >= ? AND ended_at < ?)`;
-      params.push(fromMs, toMs, fromMs, toMs);
+      // Overlap query: session spans [fromMs, toMs) if it started before the
+      // window ends and has not ended before the window starts. This returns
+      // spanning sessions (Mon->Wed queried for Tue) and live sessions.
+      sql += ` WHERE (started_at < ? AND (ended_at IS NULL OR ended_at >= ?))`;
+      params.push(toMs, fromMs);
     }
     sql += ` ORDER BY started_at ASC;`;
     const res = await this.db.executeSql(sql, params);
@@ -180,9 +203,11 @@ export class Repository {
       id: r.id,
       activityId: r.activity_id,
       status: r.status,
+      experience: r.experience === 'focus' ? 'focus' : 'track',
       startedAt: Number(r.started_at),
       endedAt: r.ended_at != null ? Number(r.ended_at) : null,
       targetSeconds: r.target_seconds != null ? Number(r.target_seconds) : null,
+      intention: r.intention ?? null,
       createdAt: Number(r.created_at),
       updatedAt: Number(r.updated_at),
     }));
@@ -373,7 +398,7 @@ export class Repository {
     }));
 
     return {
-      version: 1,
+      version: 2,
       appVersion: '1.0.0',
       exportedAt: Date.now(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
@@ -391,6 +416,10 @@ export class Repository {
   }
 
   async restoreAllData(backup: BackupData): Promise<void> {
+    const validation = validateBackupData(backup);
+    if (!validation.isValid) {
+      throw new Error(`INVALID_BACKUP: ${validation.errorMessage ?? 'Backup validation failed.'}`);
+    }
     await this.db.transaction(async (tx) => {
       // Clear existing records
       await tx.executeSql(`DELETE FROM intervals;`);
@@ -421,9 +450,20 @@ export class Repository {
       // Restore sessions
       for (const s of backup.data.sessions) {
         await tx.executeSql(
-          `INSERT INTO sessions (id, activity_id, status, started_at, ended_at, target_seconds, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-          [s.id, s.activityId, s.status, s.startedAt, s.endedAt ?? null, s.targetSeconds ?? null, s.createdAt, s.updatedAt]
+          `INSERT INTO sessions (id, activity_id, status, experience, started_at, ended_at, target_seconds, intention, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            s.id,
+            s.activityId,
+            s.status,
+            s.experience ?? (s.targetSeconds ? 'focus' : 'track'),
+            s.startedAt,
+            s.endedAt ?? null,
+            s.targetSeconds ?? null,
+            s.intention ?? null,
+            s.createdAt,
+            s.updatedAt,
+          ]
         );
       }
 

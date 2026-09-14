@@ -83,4 +83,42 @@ describe('T04 - Onboarding & Activities Invariants', () => {
     const fullList = await repo1.getActivities(true);
     expect(fullList.some((a) => a.id === 'act-deep-work' && a.isArchived)).toBe(true);
   });
+
+  test('Starter activity onboarding changes quick-access favorites without hiding the rest', async () => {
+    const allStarters = await repo1.getActivities(false);
+    expect(allStarters.length).toBeGreaterThan(3);
+
+    const favoriteIds = new Set(['act-prayer', 'act-deep-work']);
+    for (const act of allStarters) {
+      await repo1.saveActivity({
+        ...act,
+        isFavorite: favoriteIds.has(act.id),
+        isArchived: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    const remaining = await repo1.getActivities(false);
+    expect(remaining).toHaveLength(allStarters.length);
+    expect(remaining.filter((a) => a.isFavorite).map((a) => a.id).sort()).toEqual([
+      'act-deep-work',
+      'act-prayer',
+    ]);
+    expect(remaining.find((a) => a.id === 'act-sleep')?.isArchived).toBe(false);
+  });
+
+  test('Schema repair revives only the exact four-activity alpha archive pattern', async () => {
+    for (const id of ['act-exercise', 'act-cleaning', 'act-rest', 'act-sleep']) {
+      await repo1.archiveActivity(id);
+    }
+
+    await initializeDatabase(db1);
+    const repaired = await repo1.getActivities(false);
+    expect(repaired.find((a) => a.id === 'act-sleep')).toBeDefined();
+
+    await repo1.archiveActivity('act-sleep');
+    await initializeDatabase(db1);
+    const afterIntentionalSingleArchive = await repo1.getActivities(false);
+    expect(afterIntentionalSingleArchive.find((a) => a.id === 'act-sleep')).toBeUndefined();
+  });
 });

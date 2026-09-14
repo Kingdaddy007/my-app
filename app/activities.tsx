@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -30,6 +30,24 @@ export default function ActivitiesScreen() {
   const [newActivityName, setNewActivityName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0]?.id ?? 'cat-focused');
   const [targetMinsInput, setTargetMinsInput] = useState('25');
+  const [archivedActivities, setArchivedActivities] = useState<Activity[]>([]);
+
+  // Archived starters (e.g. skipped during onboarding) are recoverable here.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!repo) return;
+      try {
+        const all = await repo.getActivities(true);
+        if (mounted) setArchivedActivities(all.filter((a) => a.isArchived));
+      } catch {
+        // Best-effort only.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [repo, activities]);
 
   const filtered = activities.filter((a) =>
     a.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -178,6 +196,44 @@ export default function ActivitiesScreen() {
             );
           })}
         </View>
+
+        {/* Archived activities: visible recovery, history preserved */}
+        {archivedActivities.length > 0 ? (
+          <View style={{ marginTop: 20 }}>
+            <Text style={[typography.sectionTitle, { color: colors.primaryText, marginBottom: 4 }]}>
+              Archived
+            </Text>
+            <Text style={[typography.caption, { color: colors.secondaryText, marginBottom: 10 }]}>
+              Past history is preserved. Restore anything you still want.
+            </Text>
+            {archivedActivities
+              .filter((a) => a.name.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((act) => (
+                <Card key={act.id} variant="subtle" padding={14} style={{ marginBottom: 8 }}>
+                  <View style={styles.cardRow}>
+                    <View style={[styles.iconBox, { backgroundColor: colors.surfaceRaised }]}>
+                      <AppIcon name={act.iconKey} size={18} color={colors.mutedText} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[typography.bodyMedium, { color: colors.secondaryText }]}>
+                        {act.name}
+                      </Text>
+                    </View>
+                    <Button
+                      label="Restore"
+                      size="small"
+                      variant="outline"
+                      onPress={async () => {
+                        if (!repo) return;
+                        await repo.unarchiveActivity(act.id);
+                        await refresh();
+                      }}
+                    />
+                  </View>
+                </Card>
+              ))}
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Create Activity Modal */}
@@ -280,7 +336,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionBtn: {
-    padding: 8,
+    minHeight: 48,
+    minWidth: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 4,
   },
   categoryRow: {
@@ -289,8 +348,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    minHeight: 48,
+    justifyContent: 'center',
     borderRadius: radii.pill,
     borderWidth: 1,
   },

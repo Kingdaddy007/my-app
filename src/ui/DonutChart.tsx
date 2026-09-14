@@ -31,18 +31,20 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  // Compute stroke offsets for each slice
-  let accumulatedAngle = 0;
+  // Compute stroke segments: each slice draws only its fraction of the ring,
+  // accumulated from the top (-90deg). dasharray=fraction*C prevents the
+  // overdraw where every slice previously rendered a full circle.
+  let accumulatedFraction = 0;
   const renderedSegments = segments.map((seg) => {
     const fraction = total > 0 ? seg.value / total : 0;
-    const strokeDashoffset = circumference * (1 - fraction);
-    const rotation = (accumulatedAngle / (total || 1)) * 360 - 90;
-    accumulatedAngle += seg.value;
+    const dashOn = Math.max(0, fraction * circumference - 1.5);
+    const rotation = accumulatedFraction * 360 - 90;
+    accumulatedFraction += fraction;
 
     return {
       ...seg,
       fraction,
-      strokeDashoffset,
+      dashOn,
       rotation,
     };
   });
@@ -83,12 +85,11 @@ export const DonutChart: React.FC<DonutChartProps> = ({
                 r={radius}
                 stroke={seg.color}
                 strokeWidth={strokeWidth}
-                strokeDasharray={`${circumference} ${circumference}`}
-                strokeDashoffset={seg.strokeDashoffset}
+                strokeDasharray={`${seg.dashOn} ${circumference}`}
+                strokeDashoffset={0}
                 strokeLinecap="butt"
                 fill="transparent"
-                rotation={seg.rotation}
-                origin={`${size / 2}, ${size / 2}`}
+                transform={`rotate(${seg.rotation} ${size / 2} ${size / 2})`}
               />
             );
           })}

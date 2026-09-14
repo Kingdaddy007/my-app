@@ -26,7 +26,7 @@ export const ModalSheet: React.FC<ModalSheetProps> = ({
   title,
   children,
 }) => {
-  const { colors, mode } = useTheme();
+  const { colors, mode, reducedMotion } = useTheme();
 
   useEffect(() => {
     if (!visible) return;
@@ -42,8 +42,9 @@ export const ModalSheet: React.FC<ModalSheetProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reducedMotion ? 'fade' : 'slide'}
       onRequestClose={onClose}
+      accessibilityViewIsModal={true}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

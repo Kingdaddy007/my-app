@@ -1,28 +1,35 @@
-# VIGIL — Anti Gravity build handoff
+# AEVIA — current build handoff
 
-Status: implementation plan ready; application not yet built. Owner: Beloved. Prepared 2026-09-07.
+AEVIA is the working identity for the former VIGIL project. It is a private Android-first day companion for activity tracking, target-based focus, interruptions, sleep/wake, honest review, and opt-in support from trusted friends.
 
-## Read and execute
+## Read in this order
 
-1. Read `docs/PRODUCT.md`, then visually open all three originals listed in `docs/DESIGN.md`.
-2. Read `docs/DESIGN.md`, `docs/ARCHITECTURE.md`, `docs/TICKETS.md`, and `docs/ACCEPTANCE.md` completely before implementation.
-3. Implement tickets in dependency order. Maintain `docs/BUILD_STATUS.md`: evidence, changed files, remaining defects, exact next action. Never mark a gate passed without its evidence.
-4. Build a real Android application. Browser previews supplement native validation; they cannot establish notification, lifecycle, or Android installation correctness.
-5. Use the supplied art direction as the design authority. Preserve cinematic atmosphere, polished typography, readable controls, both themes, and purposeful motion. Do not replace it with a generic dashboard template.
-6. Continue independently through implementation and available checks. Only stop for a consequential unresolved choice, paid service, external release, or inaccessible device needed for remaining validation. Complete independent work first.
+1. `docs/AEVIA_PRODUCT_DESIGN_AUTHORITY_2026-09-14.md` — current product, journey, visual, motion, social, privacy, and widget authority.
+2. `docs/BUILD_STATUS_CURRENT.md` — what has actually been repaired and verified.
+3. `docs/AEVIA_IMPLEMENTATION_AND_RELEASE_PLAN_2026-09-14.md` — remaining Android, Circle, widget, and release gates.
+4. The three original PNG mockups in the repository — quality references, not pixel specifications.
+5. Older product/architecture/audit documents only when tracing a decision. Where they conflict with the three current documents above, the current documents win.
 
-## Delivery arrangement
+## Non-negotiable implementation rules
 
-Anti Gravity implements and self-checks. After implementation, the user returns to Codex for a separate audit task using model `gpt-5.6-luna`, reasoning effort `max`. Luna audits the actual implementation against this packet and supplies reproducible findings. The senior agent then reviews the evidence and final result. No audit task or automatic monitor has been created yet.
+- Preserve one canonical Session/Interval engine for Track, Focus, Pause, Sleep, Timeline, Review, notifications, and the future widget.
+- Do not reintroduce mint/green branding, flat polygon hero art, permanent Awake/Sleep buttons, generic identical cards, fake statistics, or a global hours leaderboard.
+- Onboarding activity selection controls quick-access favorites. It must never archive activities the user did not select.
+- Private use requires no account. Circle must remain explicitly labelled local-only until a real authenticated provider and two-identity security proof exist.
+- Keep internal `vigil` scheme/package/database identifiers during this alpha unless a deliberate migration is approved.
+- Do not commit, push, publish, deploy, create a cloud project, install system dependencies, or upload personal data without the user's explicit authorization.
 
-## Authority and cost
+## Current verification commands
 
-The user authorized this handoff and intends Anti Gravity to build. Routine reversible project implementation is in scope. Do not buy services, publish, create cloud accounts, deploy, upload personal activity records, or change global agent configuration. Inspect existing toolchains before proposing substantial system installations. No paid API, cloud database, or subscription is required by this design. Future account/sync work is a separate feature, never represented as a one-click switch.
+```bash
+npm run lint
+npm test -- --runInBand
+npx expo export --platform web --output-dir dist-aevia
+npm run web -- --port 8094
+```
 
-## Short builder prompt
+Current evidence: TypeScript clean; 8 test suites / 79 tests pass; web export succeeds; the main state journeys were exercised in the Codex in-app browser at a 412×915 Android viewport.
 
-Read START_HERE.md and every document it requires, visually inspect all three original mockups, then build VIGIL in this workspace following docs/TICKETS.md. Own the implementation end to end: real local data, robust activity timing, notifications, and exceptional cinematic light/dark UI with the motion specified in docs/DESIGN.md. Keep docs/BUILD_STATUS.md current with proof for each gate. Use the plan's design checkpoints before spreading components across screens. Run the available checks, document device-only gaps honestly, and deliver Android run/install instructions plus the audit handoff. Do not stop at scaffolding or a static mockup; continue through the complete approved scope without paid services or publishing.
+## Honest capability boundary
 
-## Later Luna audit prompt
-
-Audit VIGIL against START_HERE.md, docs/PRODUCT.md, docs/DESIGN.md, docs/ARCHITECTURE.md, docs/TICKETS.md, and docs/ACCEPTANCE.md. Inspect the three originals and actual rendered implementation. Verify timing/accounting, persistence, notifications, recovery, privacy, accessibility, and visual/motion fidelity. Read BUILD_STATUS but independently reproduce material claims. Write docs/AUDIT_LUNA.md with severity, exact file/line, reproduction, expected/actual behavior, evidence, and unverified device checks. Audit only; do not modify implementation unless separately requested. Return a prioritized repair list for the senior review.
+The local/web alpha works. Cross-device Circle, a native Android home-screen widget, notification delivery on hardware, background/process-death behavior, and APK installation are not complete or proven. They require the gates in the implementation plan.

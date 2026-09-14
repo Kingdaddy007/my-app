@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "copy-wasm": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});const wasmSrc=fs.existsSync('node_modules/sql.js/dist/sql-wasm.wasm')?'node_modules/sql.js/dist/sql-wasm.wasm':null;const browserSrc=fs.existsSync('node_modules/sql.js/dist/sql-wasm-browser.wasm')?'node_modules/sql.js/dist/sql-wasm-browser.wasm':wasmSrc;if(wasmSrc){fs.copyFileSync(wasmSrc,'public/sql-wasm.wasm');if(browserSrc)fs.copyFileSync(browserSrc,'public/sql-wasm-browser.wasm');}\"",
+    "postinstall": "npm run copy-wasm"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

@@ -89,9 +89,10 @@ describe('T03 - Durable Time Engine & Accounting Verification', () => {
 
   test('A02: Idempotency & Double-tap Prevention - Rapid start/pause calls', async () => {
     const t0 = clock.now();
-    const s1 = await engine.start('act-deep-work', t0);
-    // Immediate second start with same activity
-    const s2 = await engine.start('act-deep-work', t0);
+    const [s1, s2] = await Promise.all([
+      engine.start('act-deep-work', t0, { experience: 'track' }),
+      engine.start('act-deep-work', t0, { experience: 'track' }),
+    ]);
     expect(s1.id).toBe(s2.id);
 
     // One session only
@@ -245,5 +246,133 @@ describe('T03 - Durable Time Engine & Accounting Verification', () => {
     expect(sessions.length).toBe(2);
     expect(sessions[0].status).toBe('completed');
     expect(sessions[1].status).toBe('running');
+  });
+
+  test('Track and Focus are distinct experiences over the same session record', async () => {
+    const track = await engine.start('act-deep-work', clock.now(), { experience: 'track' });
+    expect(track.experience).toBe('track');
+    expect(track.targetSeconds).toBeNull();
+    await engine.finish();
+
+    clock.advance(1000);
+    const focus = await engine.start('act-study', clock.now(), {
+      experience: 'focus',
+      targetSeconds: 45 * 60,
+      intention: 'Finish the chapter',
+    });
+    expect(focus.experience).toBe('focus');
+    expect(focus.targetSeconds).toBe(45 * 60);
+    expect(focus.intention).toBe('Finish the chapter');
+
+    clock.advance(50 * 60 * 1000);
+    const state = await engine.getCurrentState();
+    expect(state.session?.status).toBe('running');
+    expect(state.elapsedActiveMs).toBe(50 * 60 * 1000);
+
+    const extended = await engine.extendFocusTarget(15 * 60);
+    expect(extended.targetSeconds).toBe(60 * 60);
+  });
+
+  test('open live intervals cannot be edited or deleted through history commands', async () => {
+    await engine.start('act-deep-work');
+    const current = await repo.getCurrentSession();
+    const openId = current?.openInterval?.id;
+    expect(openId).toBeTruthy();
+
+    await expect(engine.editInterval(openId!, clock.now() - 1000, clock.now() + 1000)).rejects.toThrow(
+      'OPEN_INTERVAL_PROTECTED'
+    );
+    await expect(engine.deleteInterval(openId!)).rejects.toThrow('OPEN_INTERVAL_PROTECTED');
+    expect((await repo.getCurrentSession())?.session.status).toBe('running');
+  });
+
+  test('read-only current-state and history reads do not mutate a live session', async () => {
+    const started = await engine.start('act-deep-work');
+    const before = await repo.getIntervals();
+    await engine.getCurrentState();
+    await repo.getSessions();
+    await repo.getIntervals();
+    const after = await repo.getIntervals();
+
+    expect(after).toEqual(before);
+    expect((await repo.getCurrentSession())?.session.id).toBe(started.id);
+  });
+
+  test('Strict disjoint partitioning: active + pause + sleep + untracked strictly equal elapsed day', async () => {
+    // Start at 08:00
+    const t0800 = new Date('2026-09-07T08:00:00.000Z').getTime();
+    clock.setTime(t0800);
+    await engine.start('act-deep-work');
+
+    // 25m active + 20 seconds pause (sub-minute boundary test)
+    clock.advance(25 * 60 * 1000);
+    await engine.pause('Break');
+    clock.advance(20 * 1000); // 20 seconds
+    await engine.resume();
+    clock.advance(10 * 60 * 1000);
+    await engine.finish();
+
+    const tNow = clock.now();
+    const intervals = await repo.getIntervals();
+    const sessions = await repo.getSessions();
+    const categories = await repo.getCategories();
+    const activities = await repo.getActivities(true);
+
+    const accounting = computeDayAccounting('2026-09-07', tNow, intervals, sessions, activities, categories);
+
+    const totalAccounted =
+      accounting.accountedActiveMs +
+      accounting.accountedPauseMs +
+      accounting.accountedSleepMs +
+      accounting.untrackedMs;
+
+    // Elapsed from dayStart (00:00) to tNow must match sum of all components to the millisecond
+    const dayStartMs = new Date(new Date(tNow).getFullYear(), new Date(tNow).getMonth(), new Date(tNow).getDate(), 0, 0, 0).getTime();
+    const expectedElapsed = tNow - dayStartMs;
+
+    expect(totalAccounted).toBe(expectedElapsed);
+    expect(accounting.accountedActiveMs).toBe(35 * 60 * 1000);
+    expect(accounting.accountedPauseMs).toBe(20 * 1000);
+  });
+
+  test('time before first awareness is not invented as untracked history', async () => {
+    const now = new Date('2026-09-07T09:00:00.000Z').getTime();
+    const awareness = new Date('2026-09-07T08:55:00.000Z').getTime();
+    const accounting = computeDayAccounting(
+      '2026-09-07',
+      now,
+      [],
+      [],
+      await repo.getActivities(true),
+      await repo.getCategories(),
+      awareness
+    );
+
+    expect(accounting.untrackedMs).toBe(5 * 60 * 1000);
+    expect(accounting.gaps[0]?.startMs).toBe(awareness);
+  });
+
+  test('Gap splitting validates against empty, negative, or zero durations', async () => {
+    const t0 = clock.now();
+    const gapStart = t0 + 1000;
+    const gapEnd = gapStart + 30 * 60 * 1000;
+
+    // Empty segments should throw
+    await expect(engine.splitGap(gapStart, gapEnd, [])).rejects.toThrow('EMPTY_SEGMENTS');
+
+    // Negative duration should throw
+    await expect(
+      engine.splitGap(gapStart, gapEnd, [{ activityId: 'act-study', durationMs: -5000 }])
+    ).rejects.toThrow('INVALID_DURATION');
+
+    // Zero duration should throw
+    await expect(
+      engine.splitGap(gapStart, gapEnd, [{ activityId: 'act-study', durationMs: 0 }])
+    ).rejects.toThrow('INVALID_DURATION');
+
+    // Oversized total duration should throw
+    await expect(
+      engine.splitGap(gapStart, gapEnd, [{ activityId: 'act-study', durationMs: 40 * 60 * 1000 }])
+    ).rejects.toThrow('OVERSIZED_SEGMENTS');
   });
 });

@@ -4,40 +4,48 @@ import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } f
 import { useTheme } from './ThemeContext';
 
 interface MountainLandscapeProps {
-  width?: number;
+  width?: number | string;
   height?: number;
+  baseColor?: string;
   isNight?: boolean;
+  stateTint?: 'idle' | 'running' | 'paused' | 'sleep' | 'overtime';
 }
 
 export const MountainLandscape: React.FC<MountainLandscapeProps> = ({
-  width = 360,
+  width = '100%',
   height = 260,
+  baseColor,
+  stateTint = 'idle',
 }) => {
   const { mode, colors } = useTheme();
   const isDark = mode === 'dark';
+  const effectiveBaseColor = baseColor ?? colors.surface;
+  const sleeping = stateTint === 'sleep';
+  const paused = stateTint === 'paused';
+  const overtime = stateTint === 'overtime';
 
   return (
-    <View style={[styles.container, { width, height }]}>
+    <View style={[styles.container, { width: width as never, height }]} accessible={false}>
       <Svg width="100%" height="100%" viewBox="0 0 360 260" preserveAspectRatio="xMidYMid slice">
         <Defs>
           {/* Sky Gradient */}
           <LinearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor={colors.skyGradientTop} />
-            <Stop offset="65%" stopColor={colors.skyGradientBottom} />
-            <Stop offset="100%" stopColor={colors.canvas} />
+            <Stop offset="0%" stopColor={sleeping ? '#0A1017' : colors.skyGradientTop} />
+            <Stop offset="65%" stopColor={sleeping ? '#141E2A' : paused ? colors.warmGapSurface : colors.skyGradientBottom} />
+            <Stop offset="100%" stopColor={effectiveBaseColor} />
           </LinearGradient>
 
           {/* Sun Glow Gradient */}
           <RadialGradient id="sunGlowGrad" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colors.sunDisc} stopOpacity="0.8" />
-            <Stop offset="40%" stopColor={colors.sunGlow} stopOpacity="0.4" />
+            <Stop offset="0%" stopColor={colors.sunDisc} stopOpacity="0.85" />
+            <Stop offset="40%" stopColor={colors.sunGlow} stopOpacity="0.45" />
             <Stop offset="100%" stopColor={colors.skyGradientBottom} stopOpacity="0" />
           </RadialGradient>
 
           {/* Mist Layer Gradient */}
           <LinearGradient id="mistGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <Stop offset="0%" stopColor={colors.canvas} stopOpacity="0" />
-            <Stop offset="100%" stopColor={colors.canvas} stopOpacity="0.6" />
+            <Stop offset="0%" stopColor={effectiveBaseColor} stopOpacity="0" />
+            <Stop offset="100%" stopColor={effectiveBaseColor} stopOpacity="0.75" />
           </LinearGradient>
         </Defs>
 
@@ -45,14 +53,19 @@ export const MountainLandscape: React.FC<MountainLandscapeProps> = ({
         <Rect x="0" y="0" width="360" height="260" fill="url(#skyGrad)" />
 
         {/* Sun Disc & Atmosphere Glow */}
-        <Circle cx="180" cy="115" r="70" fill="url(#sunGlowGrad)" />
+        <Circle cx="180" cy={sleeping ? 200 : 115} r="70" fill="url(#sunGlowGrad)" opacity={sleeping ? 0.25 : overtime ? 1 : 0.9} />
         <Circle
           cx="180"
-          cy="115"
-          r="26"
-          fill={colors.sunDisc}
+          cy={sleeping ? 200 : 115}
+          r={sleeping ? 18 : 26}
+          fill={sleeping ? '#C7D2FE' : colors.sunDisc}
           opacity={isDark ? 0.95 : 0.85}
         />
+
+        {/* Moon accent while sleeping */}
+        {sleeping && (
+          <Circle cx="268" cy="52" r="14" fill="#E0E7FF" opacity="0.9" />
+        )}
 
         {/* Stars (subtle in dark mode) */}
         {isDark && (
@@ -92,6 +105,11 @@ export const MountainLandscape: React.FC<MountainLandscapeProps> = ({
           d="M0,235 Q90,215 180,225 T360,228 L360,260 L0,260 Z"
           fill={colors.mountainForeground}
         />
+
+        {/* Soft atmospheric mist overlay */}
+        <Rect x="0" y="190" width="360" height="70" fill="url(#mistGrad)" />
+        {/* Reliable scrim for hero timer text over all animation frames */}
+        <Rect x="0" y="60" width="360" height="130" fill="#000000" opacity={isDark ? 0.22 : 0.12} />
       </Svg>
     </View>
   );
